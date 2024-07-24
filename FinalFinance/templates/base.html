@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}FinalFinance{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Additional CSS or external libraries -->
+</head>
+<body>
+    <div class="top-header">
+        {% if current_user.is_authenticated %}
+            <p>European markets open: 10:00 &emsp;&emsp;&emsp;| &emsp;&emsp;&emsp; US markets open: 16:30 </p>
+        {% else %}
+            <p>Signup to check financial data&emsp;<a href="{{ url_for('routes.signup') }}">Register Now</a></p>
+        {% endif %}
+    </div>
+    <header>
+        <nav>
+            <div class="nav-logo">
+                <a href="{{ url_for('routes.home') }}">
+                    <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Logo" id="nav-logo">
+                </a>
+            </div>
+            <div class="nav-main">
+                <ul>
+                    <li><a href="{{ url_for('routes.home') }}">Home</a></li>
+                    {% if current_user.is_authenticated %}
+                        <li><a href="{{ url_for('routes.fund_search') }}">Fund Search</a></li>
+                        <li><a href="{{ url_for('routes.fund_favorites') }}">Favorites</a></li>
+                        <li><a href="{{ url_for('routes.monitor') }}">Monitor</a></li>
+                    {% else %}
+                        <li><a href="{{ url_for('routes.about') }}">About</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+            <div class="nav-user">
+                <ul>
+                    {% if current_user.is_authenticated %}
+                        <li><a href="{{ url_for('routes.profile') }}">Profile</a></li>
+                        <li><a href="{{ url_for('routes.logout') }}">Logout</a></li>
+                    {% else %}
+                        <li><a href="{{ url_for('routes.login') }}">Login</a></li>
+                        <li><a href="{{ url_for('routes.signup') }}">Sign Up</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </nav>
+    </header>
+    <main>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+    <footer>
+        <p>&copy; {{ year }} FinalFinance</p>
+    </footer>
+</body>
+</html>

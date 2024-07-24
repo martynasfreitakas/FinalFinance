@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Fund Details
+{% endblock %}
+
+{% block content %}
+<div class="fund-details-container">
+    <div class="left-column">
+        <div class="fund-details-left">
+            <h2>Fund Details</h2>
+             <form action="{{ url_for('routes.add_to_favorites', cik=fund.cik) }}" method="post" style="display: inline;">
+                <button type="submit">Add to Favorites</button>
+            </form>
+            <p>Fund Name: {{ fund.company_name }}</p>
+            <p>CIK: {{ fund.cik }}</p>
+
+            {% if submissions and submissions[0] %}
+            <h2>Newest Submission Details</h2>
+            <div class="newest-holdings">
+                <p>Filed Date: {{ submissions[0].filed_of_date }}</p>
+                <p>Period: {{ submissions[0].period_of_portfolio }}</p>
+                <p>Portfolio value (USD): {{ submissions[0].fund_portfolio_value }}</p>
+                <p>Submission Type: {{ submissions[0].submission_type }}</p>
+                <p>Accession Number: {{ submissions[0].accession_number }}</p>
+            </div>
+            {% endif %}
+
+            <h2>Fund Holdings</h2>
+            <table border="1">
+                <thead>
+                    <tr>
+                        <th>Company Name</th>
+                        <th>Value (USD)</th>
+                        <th>Share Amount</th>
+                        <th>Previous Share Amount</th>
+                        <th>Change Status</th>
+                        <th>Change Amount</th>
+                        <th>Change Percentage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for holding in newest_holdings %}
+                    <tr>
+                        <td>{{ holding['Company Name'] }}</td>
+                        <td>{{ holding['Value (USD)'] }}</td>
+                        <td>{{ holding['Share Amount'] }}</td>
+                        <td>{{ holding['Previous Share Amount'] }}</td>
+                        <td>{{ holding['Change Status'] }}</td>
+                        <td>{{ holding['Change Amount'] }}</td>
+                        <td>{{ holding['Change Percentage'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="right-column">
+        <div class="add-submissions">
+            <h2>Add More Submissions</h2>
+            <form action="{{ url_for('routes.add_more_submissions', cik=fund.cik) }}" method="post">
+                <input type="date" name="start_date" required>
+                <input type="date" name="end_date" required>
+                <input type="submit" value="Add More Submissions">
+            </form>
+        </div>
+
+        <div class="submission-list">
+            <h2>Submissions</h2>
+            <table border="1">
+                <thead>
+                    <tr>
+                        <th>Filed Date</th>
+                        <th>Period</th>
+                        <th>Submission Type</th>
+                        <th>Accession Number</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for submission in submissions %}
+                    <tr>
+                        <td><a href="{{ url_for('routes.submission_details', accession_number=submission.accession_number) }}">
+                            {{ submission.filed_of_date }}</a></td>
+                        <td>{{ submission.period_of_portfolio }}</td>
+                        <td>{{ submission.submission_type }}</td>
+                        <td>{{ submission.accession_number }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,206 @@
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
+
+/* Body and general styling */
+body {
+    font-family: 'Roboto', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #ffffff;
+    padding-bottom: 100px;
+}
+
+/* Top Header */
+.top-header {
+    background-color: #ff671d;
+    color: #fff;
+    padding: 2px;
+    text-align: center;
+}
+
+/* Header */
+header {
+    background-color: #ffffff;
+    color: #ff671d;
+    padding: 0px;
+    text-align: center;
+}
+
+/* Navigation Bar */
+nav {
+    display: flex;
+    justify-content: space-between;
+    background-color: #ffffff;
+    color: #fff;
+    padding: 20px;
+    text-align: left;
+    border: 2px solid #ff671d;
+    border-left: none;
+    border-right: none;
+}
+
+.nav-logo, .nav-main, .nav-user {
+    display: flex;
+    align-items: center;
+}
+
+#nav-logo {
+    height: 50px;
+    width: 50px;
+}
+
+nav a {
+    color: #53575a;
+    text-decoration: none;
+    margin: 0 10px;
+}
+
+nav ul li a:hover {
+    color: #666;
+}
+
+/* Footer */
+footer {
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    padding: 10px;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+}
+
+ul {
+    list-style-type: none;
+}
+
+nav ul {
+    list-style-type: none;
+    padding: 0;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+
+nav ul li a {
+    position: relative;
+    text-decoration: none;
+    color: #53575a;
+    transition: color 0.3s ease;
+}
+
+nav ul li a::after {
+    content: "";
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background-color: #53575a;
+    transition: all 0.3s ease;
+}
+
+nav ul li a:hover {
+    color: #53575a;
+}
+
+nav ul li a:hover::after {
+    left: calc(50% - 5px);
+    width: 10px;
+    height: 10px;
+    bottom: -15px;
+    background-color: #ff671d;
+}
+
+/* Fund Details Container */
+.fund-details-container {
+    display: flex;
+    background-color: #f9f9f9;
+    padding: 20px;
+    margin-top: 20px;
+    border-radius: 5px;
+    margin-bottom: 100px;
+}
+
+.left-column, .right-column {
+    flex: 1;
+}
+
+.left-column {
+    padding-right: 20px;
+}
+
+.right-column {
+    padding-left: 20px;
+}
+
+.newest-holdings {
+    margin-top: 20px;
+}
+
+.newest-holdings p {
+    margin: 5px 0;
+}
+
+/* Add Submissions */
+.add-submissions {
+    margin-bottom: 20px;
+}
+
+/* Submissions List */
+.submission-list {
+    overflow: hidden;
+}
+
+.submission-list table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.submission-list th, .submission-list td {
+    border: 1px solid #dddddd;
+    text-align: left;
+    padding: 8px;
+}
+
+.submission-list th {
+    background-color: #f2f2f2;
+}
+
+.submission-list tbody tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+/* Adjusted Footer */
+footer {
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    padding: 10px;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+}
+
+/* Search Container */
+.search-container {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.search-input, .search-button {
+    font-size: 16px;
+    padding: 10px;
+    margin: 0 5px;
+}
+
+.search-input {
+    width: 300px;
+}
+
+.search-button {
+    cursor: pointer;
+    background-color: #ff671d;
+    color

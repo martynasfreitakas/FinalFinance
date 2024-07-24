@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Monitor - FinalFinance
+{% endblock %}
+
+{% block content %}
+
+    {% if favorite_funds %}
+        <div class="favorite-funds-block">
+            <h2>Favorite Funds</h2>
+            <form id="monitor-form" action="{{ url_for('routes.monitor') }}" method="POST">
+                <table border="1">
+                    <thead>
+                        <tr>
+                            <th>Fund Name</th>
+                            <th>CIK</th>
+                            <th>Monitor</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for favorite in favorite_funds %}
+                        <tr>
+                            <td>{{ favorite.fund.fund_name }}</td>
+                            <td>{{ favorite.fund.cik }}</td>
+                            <td>
+                                <input type="radio" name="monitored_cik" value="{{ favorite.fund.cik }}"
+                                       {% if favorite.fund.cik == monitored_cik %}checked{% endif %}
+                                       onchange="document.getElementById('monitor-form').submit()">
+                            </td>
+                            <td>
+                                <form action="{{ url_for('routes.remove_from_favorites', fund_id=favorite.fund.id) }}" method="post" style="display: inline;">
+                                    <button type="submit">Remove from Favorites</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </form>
+        </div>
+    {% endif %}
+
+    {% if fund %}
+        {% if newest_submission %}
+            <h3>Newest Submission Details</h3>
+            <div class="newest-holdings">
+                <p>Filed Date: {{ newest_submission.filed_of_date }}</p>
+                <p>Period: {{ newest_submission.period_of_portfolio }}</p>
+                <p>Portfolio value (USD): {{ newest_submission.fund_portfolio_value }}</p>
+                <p>Submission Type: {{ newest_submission.submission_type }}</p>
+                <p>Accession Number: {{ newest_submission.accession_number }}</p>
+            </div>
+        {% endif %}
+
+        {% if newest_holdings %}
+            <h3>Newest Holdings</h3>
+            <table border="1">
+                <thead>
+                    <tr>
+                        <th>Company Name</th>
+                        {% for col in newest_holdings[0].keys() %}
+                            {% if col != 'Company Name' %}
+                                <th>{{ col }}</th>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for holding in newest_holdings %}
+                        <tr>
+                            <td>{{ holding['Company Name'] }}</td>
+                            {% for col in holding.keys() %}
+                                {% if col != 'Company Name' %}
+                                    <td>{{ holding[col] }}</td>
+                                {% endif %}
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No holdings found for this fund.</p>
+        {% endif %}
+
+    {% else %}
+        <p>No fund details found.</p>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Home</title>
+</head>
+<body>
+    <h1>{{ arg1 }}</h1>
+    <p>Welcome to the Admin Home Page</p>
+
+    {% if current_user.is_authenticated %}
+        <p>Hello, {{ current_user.username }}!</p>
+        <form action="{{ url_for('routes.admin_logout') }}" method="post">
+            <input type="submit" value="Logout">
+        </form>
+    {% else %}
+        <form action="{{ url_for('routes.admin_login') }}" method="post">
+            {{ form.hidden_tag() }}
+            <p>
+                {{ form.username.label }}
+                {{ form.username }}
+            </p>
+            <p>
+                {{ form.password.label }}
+                {{ form.password }}
+            </p>
+            <p>
+                {{ form.submit }}
+            </p>
+        </form>
+
+        <p>Don't have an account? <a href="{{ url_for('routes.admin_signup') }}">Sign up here</a></p>
+    {% endif %}
+</body>
+</html>

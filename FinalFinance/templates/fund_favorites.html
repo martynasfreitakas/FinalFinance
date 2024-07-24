@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}
+My Favorite Funds
+{% endblock %}
+
+{% block content %}
+<h1>My Favorite Funds</h1>
+
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <ul>
+        {% for message in messages %}
+        <li>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+{% endwith %}
+
+<div class="favorite-funds-block">
+    <h2>Favorite Funds</h2>
+    {% if current_user.is_authenticated %}
+    {% if favorite_funds %}
+    <ul>
+        {% for favorite in favorite_funds %}
+        <li>
+            <a href="#">{{ favorite.fund.fund_name }}: {{ favorite.fund.cik }}</a>
+            <form action="{{ url_for('routes.remove_from_favorites', fund_id=favorite.fund.id) }}" method="post" style="display: inline;">
+                <button type="submit">Remove from Favorites</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No favorite funds added yet.</p>
+    {% endif %}
+    {% else %}
+    <p>Please <a href="{{ url_for('routes.login') }}">log in</a> to view favorite funds.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends 'admin_base.html' %}
+{% block title %}Admin Logout{% endblock %}
+{% block content %}
+<div class="container">
+    <h2>Admin Logout</h2>
+    <p>Are you sure you want to logout, {{ current_user.username }}?</p>
+    <form method="POST" action="{{ url_for('routes.admin_logout') }}">
+        <button type="submit" class="btn btn-danger">Logout</button>
+    </form>
+</div>
+{% endblock %}
