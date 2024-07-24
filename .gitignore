@@ -1,0 +1,12 @@
+FinalFinance/.venv/
+.env
+*instance/
+TODO.md
+FUNDS.md
+__pycache__/
+.idea/
+sec-edgar-filings/
+.logfile.log
+idea.properties
+static/images/
+static/plots/
