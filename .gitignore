@@ -1,12 +1,27 @@
-FinalFinance/.venv/
+# Python bytecode files
+__pycache__/
+*.py[cod]
+
+# Environment variables
 .env
-*instance/
+
+# Documentation and notes
 TODO.md
 FUNDS.md
-__pycache__/
-.idea/
-sec-edgar-filings/
-.logfile.log
-idea.properties
-static/images/
-static/plots/
+
+# Virtual environment
+*.venv/
+*venv/
+
+# IDE and editor settings
+*.idea/
+
+# Logs
+*logs/
+*.log
+
+# Miscellaneous
+*instance/
+*sec-edgar-filings/
+*static/images/
+*static/plots/
