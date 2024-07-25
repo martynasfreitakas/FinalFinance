@@ -203,4 +203,32 @@ footer {
 .search-button {
     cursor: pointer;
     background-color: #ff671d;
-    color
+    color}
+
+.columns-container {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.column {
+    width: 48%;
+}
+
+.plot-container {
+    display: flex;
+    align-items: flex-start;
+}
+
+.well-known-funds {
+    width: 48%;
+}
+
+.plot-container img {
+    max-width: 100%;
+    height: auto;
+    border: 1px solid #ccc;
+    padding: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+

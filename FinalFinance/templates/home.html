@@ -1,83 +1,96 @@
 {% extends 'base.html' %}
 
+{% block title %}
+FinalFinance
+{% endblock %}
+
 {% block content %}
-    <h1 class="centered-title">Uncover Your Investment Journey. Discover Funds Investment Portfolio.</h1>
+<h1 class="centered-title">Uncover Your Investment Journey. Discover Funds Investment Portfolio.</h1>
 
-    <div class="search-container">
-        <form action="{{ url_for('routes.fund_search') }}" method="get">
-            <input type="text" name="query" placeholder="Fund Search by Name or CIK" class="search-input">
-            <input type="submit" value="Search" class="search-button">
-        </form>
-    </div>
-    <br>
+<div class="search-container">
+    <form action="{{ url_for('routes.fund_search') }}" method="get">
+        <input type="text" name="query" placeholder="Fund Search by Name or CIK" class="search-input">
+        <input type="submit" value="Search" class="search-button">
+    </form>
+</div>
+<br>
 
-    {% if query %}
-        <div class="company-search-results-block">
-            <h2>Search Results</h2>
-            {% if funds %}
-                <ul>
-                    {% for fund in funds %}
-                        <li>
-                            <form action="{{ url_for('routes.add_to_favorites', fund_id=fund.id) }}" method="post" style="display: inline;">
-                                <button type="submit">Add to Favorites</button>
-                            </form>
-                            <a href="{{ url_for('routes.fund_details', cik=fund.cik) }}">{{ fund.fund_name }}: {{ fund.cik }}</a>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p>No results found</p>
-            {% endif %}
-        </div>
+{% if query %}
+<div class="company-search-results-block">
+    <h2>Search Results</h2>
+    {% if funds %}
+    <ul>
+        {% for fund in funds %}
+        <li>
+            <form action="{{ url_for('routes.add_to_favorites', fund_id=fund.id) }}" method="post"
+                  style="display: inline;">
+                <button type="submit">Add to Favorites</button>
+            </form>
+            <a href="{{ url_for('routes.fund_details', cik=fund.cik) }}">{{ fund.fund_name }}: {{ fund.cik }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No results found</p>
     {% endif %}
+</div>
+{% endif %}
 
-    <div class="columns-container">
-        <div class="column">
-            <h2>Well Known Funds</h2>
-            <ul>
-                {% for fund_name, cik in well_known_funds.items() %}
-                    <li><a href="{{ url_for('routes.fund_details', cik=cik) }}">{{ fund_name }}: {{ cik }}</a></li>
-                {% endfor %}
-            </ul>
-        </div>
-        <div class="right-text-block">
-            <h2>About Us</h2>
-            <p>FinalFinance is a financial information website that provides investment data for individual
-                investors, particularly those interested in value investing. The site aggregates and displays
-                information about the stock holdings of prominent investment managers,
-                enabling users to track the portfolios of some of the most successful investors in the world.
-                FinalFinance is a valuable resource for individual investors looking to make informed decisions
-                by leveraging the insights and strategies of highly successful value investors.</p>
-        </div>
-    </div>
-
-    <div class="plot-container">
-        <img src="{{ url_for('static', filename='images/' + image_filename) }}" alt="Historical Data Plot">
-    </div>
-
-    <div class="rss-feed-block">
-        <h3>RSS Feed</h3>
-        <table>
+<div class="columns-container">
+    <div class="column well-known-funds">
+        <h2>Well Known Funds</h2>
+        <table border="1">
             <thead>
-                <tr>
-                    <th>Company Name</th>
-                    <th>Form Type</th>
-                    <th>CIK</th>
-                    <th>Filed Date</th>
-                    <th>Accession Number</th>
-                </tr>
+            <tr>
+                <th>Fund Name</th>
+                <th>CIK</th>
+                <th>Action</th>
+            </tr>
             </thead>
             <tbody>
-                {% for item in rss_feed_entries %}
-                    <tr>
-                        <td>{{ item.company_name }}</td>
-                        <td>{{ item.form_type }}</td>
-                        <td>{{ item.cik }}</td>
-                        <td>{{ item.filed_date }}</td>
-                        <td>{{ item.acc_no }}</td>
-                    </tr>
-                {% endfor %}
+            {% for fund_name, cik in well_known_funds.items() %}
+            <tr>
+                <td>{{ fund_name }}</td>
+                <td>{{ cik }}</td>
+                <td>
+                    <form action="{{ url_for('routes.add_to_favorites', cik=cik) }}" method="post"
+                          style="display: inline;">
+                        <button type="submit">Add to Favorites</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
             </tbody>
         </table>
     </div>
+    <div class="column plot-container">
+        <img src="{{ url_for('static', filename='images/' + image_filename) }}" alt="Historical Data Plot">
+    </div>
+</div>
+
+<div class="rss-feed-block">
+    <h3>RSS Feed</h3>
+    <table border="1">
+        <thead>
+        <tr>
+            <th>Company Name</th>
+            <th>Form Type</th>
+            <th>CIK</th>
+            <th>Filed Date</th>
+            <th>Accession Number</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for item in rss_feed_entries %}
+        <tr>
+            <td>{{ item.company_name }}</td>
+            <td>{{ item.form_type }}</td>
+            <td>{{ item.cik }}</td>
+            <td>{{ item.filed_date }}</td>
+            <td>{{ item.acc_no }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% endblock %}

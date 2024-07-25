@@ -682,14 +682,17 @@ def monitor() -> str:
     # Sort DataFrame by Company Name and Accession Number
     holdings_df.sort_values(by=['Company Name', 'Accession Number'], ascending=[True, False], inplace=True)
 
-    accession_numbers = [submission.accession_number for submission in all_submissions[:5]]
+    # Adjust the number of periods to include
+    number_of_periods = 10  # Adjust this number to increase or decrease the number of terms
+    accession_numbers = [submission.accession_number for submission in all_submissions[:number_of_periods]]
+    periods = [submission.period_of_portfolio for submission in all_submissions[:number_of_periods]]
 
     merged_holdings_df = pd.DataFrame(columns=['Company Name'])
 
     if accession_numbers:
-        for i, accession_number in enumerate(accession_numbers):
+        for i, (accession_number, period) in enumerate(zip(accession_numbers, periods)):
             temp_df = holdings_df[holdings_df['Accession Number'] == accession_number].copy()
-            column_name = 'Share Amount' if i == 0 else f'Previous Share Amount +{i}'
+            column_name = f'{period}' if i != 0 else 'Newest'
             temp_df.rename(columns={'Share Amount': column_name}, inplace=True)
             merged_holdings_df = pd.merge(
                 merged_holdings_df,
@@ -704,13 +707,12 @@ def monitor() -> str:
     for col in merged_holdings_df.columns[1:]:
         merged_holdings_df[col] = merged_holdings_df[col].astype(int)
 
-    # Reorder columns to show Company Name, then Previous Share Amounts, then Share Amount
-    columns_order = ['Company Name'] + [col for col in merged_holdings_df.columns if 'Previous Share Amount' in col][
-                                       ::-1] + ['Share Amount']
+    # Reorder columns to show Company Name, then Previous Share Amounts in reverse order, then Newest
+    columns_order = ['Company Name'] + [col for col in merged_holdings_df.columns if col not in ['Company Name', 'Newest']][::-1] + ['Newest']
     merged_holdings_df = merged_holdings_df[columns_order]
 
     # Check for companies with current Share Amount of 0 but non-zero previous amounts
-    condition = (merged_holdings_df['Share Amount'] == 0) & (merged_holdings_df.iloc[:, 1:-1].sum(axis=1) != 0)
+    condition = (merged_holdings_df['Newest'] == 0) & (merged_holdings_df.iloc[:, 1:-1].sum(axis=1) != 0)
     zero_share_but_previous_non_zero = merged_holdings_df[condition]
 
     holdings_list = merged_holdings_df.to_dict(orient='records')
