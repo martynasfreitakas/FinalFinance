@@ -1,5 +1,8 @@
 import uuid
 from datetime import datetime
+
+import numpy as np
+
 from .database import db
 from flask import render_template, flash, redirect, url_for, request, Blueprint, send_from_directory, current_app
 from .forms import SignUpForm, LoginForm, UpdateProfileForm, AdminSignUpForm
@@ -319,7 +322,6 @@ def submission_details(accession_number: str) -> str:
 
 
 @routes.route('/fund_details/<cik>', methods=['GET', 'POST'])
-@login_required
 def fund_details(cik: str) -> str:
     """
     Route for displaying and managing fund details.
@@ -419,10 +421,10 @@ def fund_details(cik: str) -> str:
 
                 # Calculate change in share amount and percentage
                 merged_holdings_df['Change Amount'] = merged_holdings_df['Share Amount'] - merged_holdings_df[
-                    'Previous Share Amount']
-                merged_holdings_df['Change Percentage'] = (merged_holdings_df['Change Amount'] / merged_holdings_df[
-                    'Previous Share Amount']) * 100
-                merged_holdings_df['Change Percentage'] = merged_holdings_df['Change Percentage'].fillna(100)
+                    'Previous Share Amount'].fillna(0)
+                merged_holdings_df['Change Percentage'] = merged_holdings_df.apply(
+                    lambda row: 100 if row['Previous Share Amount'] == 0 else (row['Change Amount'] / row[
+                        'Previous Share Amount']) * 100, axis=1)
 
                 # Determine change status
                 merged_holdings_df['Change Status'] = 'No Change'
@@ -441,26 +443,30 @@ def fund_details(cik: str) -> str:
                 previous_holdings_not_in_current['Share Amount'] = 0
                 previous_holdings_not_in_current['Change Status'] = 'Position Closed'
                 previous_holdings_not_in_current['New Company'] = False
-                previous_holdings_not_in_current['Change Amount'] = -previous_holdings_not_in_current[
-                    'Previous Share Amount']
+                previous_holdings_not_in_current['Change Amount'] = -previous_holdings_not_in_current['Share Amount']
                 previous_holdings_not_in_current['Change Percentage'] = -100
 
                 # Append these rows to the merged holdings DataFrame
                 merged_holdings_df = pd.concat([merged_holdings_df, previous_holdings_not_in_current],
                                                ignore_index=True)
 
-            except KeyError as e:
-                flash(f'Error accessing "Previous Share Amount" column: {e}')
-                # Handle the error as appropriate, possibly redirect or display an error message
+            except KeyError:
+                # Handle case when 'Previous Share Amount' is missing
+                current_holdings_df['Previous Share Amount'] = 0
+                current_holdings_df['New Company'] = True
+                current_holdings_df['Change Status'] = 'New Investment'
+                current_holdings_df['Change Amount'] = current_holdings_df['Share Amount']
+                current_holdings_df['Change Percentage'] = 100
+                merged_holdings_df = current_holdings_df
 
         else:
             # Handle case when there is no previous accession
-            merged_holdings_df = current_holdings_df.copy()
-            merged_holdings_df['Previous Share Amount'] = 0
-            merged_holdings_df['New Company'] = True
-            merged_holdings_df['Change Status'] = 'New Investment'
-            merged_holdings_df['Change Amount'] = merged_holdings_df['Share Amount']
-            merged_holdings_df['Change Percentage'] = 100
+            current_holdings_df['Previous Share Amount'] = 0
+            current_holdings_df['New Company'] = True
+            current_holdings_df['Change Status'] = 'New Investment'
+            current_holdings_df['Change Amount'] = current_holdings_df['Share Amount']
+            current_holdings_df['Change Percentage'] = 100
+            merged_holdings_df = current_holdings_df
 
         # Round necessary columns and handle new investments
         merged_holdings_df['Value (USD)'] = merged_holdings_df['Value (USD)'].fillna(0).astype(int)
