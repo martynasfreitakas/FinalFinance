@@ -31,25 +31,42 @@ from .models import User
 from werkzeug.security import check_password_hash
 from flask_login import current_user
 
+# Load environment variables from a .env file
 load_dotenv()
 
 
-def setup_logging(default_path='logging.conf', default_level=logging.INFO):
-    """Setup logging configuration."""
+def setup_logging(default_path: str = 'logging.conf', default_level: int = logging.INFO) -> None:
+    """
+    Setup logging configuration.
+
+    This function sets up logging based on the configuration provided in the logging configuration file.
+    If the file does not exist or fails to load, it defaults to basic logging configuration.
+
+    Args:
+        default_path (str): The path to the logging configuration file.
+        default_level (int): The default logging level if the configuration file is not found or fails to load.
+    """
     path = default_path
+
+    # Check if the logging configuration file exists
     if os.path.exists(path):
         try:
+            # Load the logging configuration from the file
             logging.config.fileConfig(path)
         except Exception as e:
+            # If loading fails, print the error and use the default logging configuration
             print(f"Failed to load logging configuration: {e}")
             logging.basicConfig(level=default_level)
     else:
+        # If the logging configuration file is not found, use the default logging configuration
         print(f"Logging configuration file {path} not found. Using default configuration.")
         logging.basicConfig(level=default_level)
 
 
+# Initialize logging
 setup_logging()
 
+# Create a logger instance
 logger = logging.getLogger('sLogger')
 
 
@@ -64,48 +81,60 @@ def download_and_store_all_companies_names_and_cik_from_edgar() -> None:
     """
     Download and store all company names and CIKs from the SEC's Edgar database.
 
+    This function retrieves the data from the SEC Edgar database, processes it,
+    and stores the company names and CIKs in the database. It also handles merging
+    duplicate CIK entries.
+
+    Raises:
+        requests.RequestException: If the request to the SEC Edgar database fails.
     """
     logger.info('Starting downloading data from Edgar.')
 
+    # URL for the SEC Edgar CIK lookup data
     url = "https://www.sec.gov/Archives/edgar/cik-lookup-data.txt"
-
     headers = {"User-Agent": get_user_agent()}
 
-    response = requests.get(url, headers=headers)
+    try:
+        # Send a GET request to the SEC Edgar database
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        # Log an error if the request fails
+        logger.error(f"Error during HTTP request: {e}")
+        return
 
     if response.status_code == 200:
-        logger.info('Connected succesfully.')
+        logger.info('Connected successfully.')
         data_line = response.text.splitlines()
         all_lines_in_document = len(data_line)
         data = [(line.split(":")[0], line.split(":")[1].rstrip(':')) for line in data_line if ":" in line]
 
+        # Process and store each company name and CIK in the database
         for number_downloaded, (fund_name, fund_cik) in enumerate(data, start=1):
             fund_data = FundData(fund_name=fund_name, cik=fund_cik)
             db.session.add(fund_data)
             if number_downloaded % 1000 == 0:
-                logging.info(f"Processed {number_downloaded} of {all_lines_in_document} lines.")
+                logger.info(f"Processed {number_downloaded} of {all_lines_in_document} lines.")
         db.session.commit()
 
+        # Handle merging of duplicate CIK entries
         results = db.session.query(
             FundData.cik,
             func.group_concat(FundData.fund_name, ', ').label('fund_names')
         ).group_by(FundData.cik).having(func.count(FundData.cik) > 1).all()
 
-        for number_dublicates, result in enumerate(results, start=1):
+        for number_duplicates, result in enumerate(results, start=1):
             fund_cik, fund_names = result
-
             fund_data = FundData.query.filter_by(cik=fund_cik).first()
-
             fund_data.fund_name = fund_names
-
             FundData.query.filter(FundData.cik == fund_cik, FundData.id != fund_data.id).delete()
 
-            if number_dublicates % 1000 == 0:
-                logging.info(f"Processed {number_dublicates} of {all_lines_in_document} updates.")
+            if number_duplicates % 1000 == 0:
+                logger.info(f"Processed {number_duplicates} of {all_lines_in_document} updates.")
 
         db.session.commit()
     else:
-        print(f"Error: {response.status_code}")
+        logger.error(f"Error: {response.status_code}")
 
 
 def edgar_downloader_from_sec(fund_cik: str,
@@ -113,8 +142,20 @@ def edgar_downloader_from_sec(fund_cik: str,
                               end_date: Optional[datetime] = None) -> None:
     """
     Download SEC filings for a given fund CIK between specified dates and store them locally.
-    """
 
+    This function downloads SEC filings of specified types for a given fund CIK within the date range
+    and stores them in the local file system. If the filing type directory exists, it is cleared before
+    downloading new filings.
+
+    Args:
+        fund_cik (str): The Central Index Key (CIK) of the fund.
+        start_date (Optional[datetime]): The start date for the filings to be downloaded. Defaults to 2022-02-01.
+        end_date (Optional[datetime]): The end date for the filings to be downloaded. Defaults to 2024-07-24.
+
+    Raises:
+        HTTPError: If an HTTP error occurs during the download process.
+        Exception: If any other error occurs during the download process.
+    """
     filing_types = ['NPORT-P', '13F-HR']
 
     if start_date is None:
@@ -122,17 +163,21 @@ def edgar_downloader_from_sec(fund_cik: str,
     if end_date is None:
         end_date = datetime(2024, 7, 24)
 
-    # Should be as it is, because downloader can break
+    # Base directory path for storing SEC filings
     dir_path = 'sec-edgar-filings'
 
     for filing_type in filing_types:
+        # Path to store filings of a specific type for the given fund CIK
         filings_path = os.path.join(dir_path, fund_cik, filing_type)
         if os.path.exists(filings_path):
+            # Clear the existing directory if it exists
             shutil.rmtree(filings_path)
         os.makedirs(filings_path)
 
         try:
+            # Initialize the downloader with the base directory path and email for authorization
             dl = Downloader(dir_path, os.environ['EMAIL_FOR_AUTHORIZATION'])
+            # Download filings of the specified type for the given CIK within the date range
             dl.get(filing_type, fund_cik, after=start_date, before=end_date)
         except HTTPError as e:
             if e.response.status_code == 404:
@@ -142,25 +187,35 @@ def edgar_downloader_from_sec(fund_cik: str,
         except Exception as e:
             print(f"An error occurred: {e}")
 
+        # Remove the directory if no filings were downloaded
         if not os.listdir(filings_path):
             os.rmdir(filings_path)
 
+        # Add downloaded filings to the database
         add_filing_to_db(fund_cik)
 
 
 def add_filing_to_db(fund_cik: str) -> None:
     """
     Process and add SEC filings for a given fund CIK to the database.
+
+    This function processes the downloaded SEC filings for a given fund CIK by extracting
+    relevant holdings information and storing it in the database.
+
+    Args:
+        fund_cik (str): The Central Index Key (CIK) of the fund.
     """
     directory_path = os.path.join('sec-edgar-filings', fund_cik)
     if not os.path.exists(directory_path):
         print(f"Directory does not exist: {directory_path}")
         return
 
+    # Iterate through subdirectories for each filing type
     subdirectories = [directory for directory in os.listdir(directory_path) if
                       os.path.isdir(os.path.join(directory_path, directory))]
     for subdirectory in subdirectories:
         subdirectory_path = os.path.join(directory_path, subdirectory)
+        # Iterate through subdirectories for each filing date
         sub_subdirectories = [directory for directory in os.listdir(subdirectory_path) if
                               os.path.isdir(os.path.join(subdirectory_path, directory))]
 
@@ -170,6 +225,7 @@ def add_filing_to_db(fund_cik: str) -> None:
             if not files:
                 continue
 
+            # Process each file in the sub_subdirectory
             for file in files:
                 file_path = os.path.join(sub_subdirectory_path, file)
                 extract_holdings_from_file(file_path)
@@ -178,13 +234,21 @@ def add_filing_to_db(fund_cik: str) -> None:
 def extract_holdings_from_file(path_to_file: str) -> None:
     """
     Extract holdings from a given file and add them to the database.
+
+    This function reads an SEC filing file, parses its content to extract relevant holdings information,
+    and stores the extracted data in the database. It handles updates to existing records and adds new records as needed.
+
+    Args:
+        path_to_file (str): The path to the SEC filing file.
     """
     with open(path_to_file, 'r') as file:
         data = file.read()
 
+    # Parse the file content with BeautifulSoup
     soup = BeautifulSoup(data, 'lxml')
     tags = soup.find_all(['infotable', 'ns1:infotable', 'invstorsec'])
 
+    # Regular expressions to extract various metadata from the file
     cik_tag_line = re.compile(r'CENTRAL INDEX KEY:\s+(\d+)')
     owner_cik = cik_tag_line.search(data).group(1) if cik_tag_line.search(data) else None
 
@@ -218,13 +282,16 @@ def extract_holdings_from_file(path_to_file: str) -> None:
     else:
         period_of_portfolio = None
 
+    # Retrieve the fund data from the database
     fund_data = FundData.query.filter_by(cik=owner_cik).first()
     if not fund_data:
         print(f"No FundData found for CIK: {owner_cik}")
         return
 
+    # Check if the submission already exists in the database
     existing_submission = Submission.query.filter_by(accession_number=accession_number).first()
     if existing_submission:
+        # Update the existing submission
         submission = existing_submission
         submission.cik = owner_cik
         submission.company_name = company_conformed_name
@@ -233,6 +300,7 @@ def extract_holdings_from_file(path_to_file: str) -> None:
         submission.period_of_portfolio = period_of_portfolio
         submission.fund_data_id = fund_data.id
     else:
+        # Add a new submission to the database
         submission = Submission(
             cik=owner_cik,
             company_name=company_conformed_name,
@@ -249,6 +317,7 @@ def extract_holdings_from_file(path_to_file: str) -> None:
 
     for tag in tags:
         try:
+            # Extract holdings information based on the tag type
             if tag.name in ['infotable', 'ns1:infotable']:
                 nameofissuer = tag.find(['nameofissuer', 'ns1:nameofissuer']).text.strip() if tag.find(
                     ['nameofissuer', 'ns1:nameofissuer']) else None
@@ -267,9 +336,11 @@ def extract_holdings_from_file(path_to_file: str) -> None:
             if nameofissuer:
                 fund_owns_companies += 1
 
+            # Check if the fund holding already exists in the database
             existing_fund_holding = FundHoldings.query.filter_by(company_name=nameofissuer,
                                                                  accession_number=accession_number).first()
             if existing_fund_holding:
+                # Update the existing fund holding
                 existing_fund_holding.value_usd = value
                 existing_fund_holding.share_amount = sshprnamt
                 existing_fund_holding.cusip = cusip
@@ -277,6 +348,7 @@ def extract_holdings_from_file(path_to_file: str) -> None:
                 existing_fund_holding.period_of_portfolio = period_of_portfolio
                 existing_fund_holding.fund_data_id = fund_data.id
             else:
+                # Add a new fund holding to the database
                 fund_holding = FundHoldings(
                     company_name=nameofissuer,
                     value_usd=value,
@@ -292,6 +364,7 @@ def extract_holdings_from_file(path_to_file: str) -> None:
         except Exception as e:
             print(f"Error processing tag: {e}")
 
+    # Update the submission with portfolio value and number of owned companies
     submission.fund_portfolio_value = fund_portfolio_value
     submission.fund_owns_companies = fund_owns_companies
 
@@ -305,8 +378,14 @@ def extract_holdings_from_file(path_to_file: str) -> None:
 def get_fund_lists() -> Dict[str, str]:
     """
     Retrieve a dictionary of well-known funds and their Central Index Keys (CIKs).
-    Manually set Funds.
+
+    This function returns a manually set dictionary containing the names of well-known funds
+    and their corresponding CIKs. These CIKs are used to identify the funds in the SEC database.
+
+    Returns:
+        Dict[str, str]: A dictionary where the keys are fund names and the values are their CIKs.
     """
+    # Manually set dictionary of well-known funds and their CIKs
     well_known_funds = {
         'Berkshire Hathaway': '0001067983',
         'Sequoia Fund': '0000089043',
@@ -317,53 +396,6 @@ def get_fund_lists() -> Dict[str, str]:
     return well_known_funds
 
 
-# def get_plot_base64(ticker_symbol='spy', period='1y', interval='1d'):
-#     # Period
-#     # 1d, 5d: Data for the last 1 or 5 days.
-#     # 1mo, 3mo, 6mo: Data for the last 1, 3, or 6 months.
-#     # 1y, 2y, 5y, 10y, ytd: Data for the last 1, 2, 5, 10 years, or year to date.
-#     # max: All available data.
-#
-#     # Interval
-#     # 1m, 2m, 5m, 15m, 30m, 60m, 90m: Intraday data at 1, 2, 5, 15, 30, 60,
-#     #   or 90-minute intervals. Intraday data might not be available for
-#     #    all periods.
-#     # 1h: Hourly data.
-#     # 1d, 5d: Daily or weekly data.
-#     # 1wk: Weekly data.
-#     # 1mo, 3mo: Monthly or quarterly data.
-#     buf = None  # Initialize buf variable
-#
-#     try:
-#         ticker = Ticker(ticker_symbol)
-#         hist = ticker.history(period=period, interval=interval)
-#
-#         fig = Figure(figsize=(10, 5))
-#         ax = fig.subplots()
-#         ax.plot(hist.index, hist['Close'], label=ticker_symbol)
-#         ax.set_xlabel('Date')
-#         ax.set_ylabel('Close Price')
-#         ax.set_title(f'{ticker_symbol} Historical Data ({period} period)')
-#         ax.legend()
-#         ax.grid(True)
-#
-#         buf = BytesIO()
-#         fig.savefig(buf, format='png')
-#         buf.seek(0)
-#         base64_img = base64.b64encode(buf.getvalue()).decode('utf-8')
-#         plt.close(fig)
-#
-#         return base64_img
-#
-#     except Exception as e:
-#         print(f"Error generating plot for {ticker_symbol}: {str(e)}")
-#         return None
-#
-#     finally:
-#         if buf:
-#             buf.close()
-
-
 def save_plot_to_file(
         ticker_symbol: str = 'SPY',
         period: str = '1y',
@@ -372,20 +404,30 @@ def save_plot_to_file(
     """
     Generate a plot of historical stock prices for a given ticker symbol and save it to a file.
 
-    ticker_symbol (str): The ticker symbol for the stock. Defaults to 'SPY'.
-    period (str): The period of the data to retrieve. Defaults to '1y'.
-                    Possible values include '1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'.
-    interval (str): The interval between data points. Defaults to '1d'.
-                    Possible values include '1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d',
-                    '1wk', '1mo', '3mo'.
+    This function retrieves historical stock price data for a given ticker symbol, generates a plot of the closing prices,
+    and saves the plot to a specified file.
+
+    Args:
+        ticker_symbol (str): The ticker symbol for the stock. Defaults to 'SPY'.
+        period (str): The period of the data to retrieve. Defaults to '1y'.
+                      Possible values include '1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'.
+        interval (str): The interval between data points. Defaults to '1d'.
+                        Possible values include '1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d',
+                        '1wk', '1mo', '3mo'.
+        filename (Optional[str]): The path to the file where the plot will be saved. If None, the plot is not saved.
+
+    Returns:
+        Optional[str]: The filename where the plot is saved, or None if the plot is not saved.
     """
     try:
         print(f"Generating plot for {ticker_symbol} with period {period} and interval {interval}")
 
+        # Retrieve historical stock price data
         ticker = Ticker(ticker_symbol)
         hist = ticker.history(period=period, interval=interval)
         print(f"Retrieved historical data for {ticker_symbol}")
 
+        # Create the plot
         fig = Figure(figsize=(10, 5))
         ax = fig.subplots()
         ax.plot(hist.index, hist['Close'], label=ticker_symbol)
@@ -395,6 +437,7 @@ def save_plot_to_file(
         ax.legend()
         ax.grid(True)
 
+        # Save the plot to a file if a filename is provided
         if filename:
             print(f"Saving plot to file: {filename}")
             fig.savefig(filename)
@@ -414,6 +457,15 @@ def save_plot_to_file(
 def fetch_rss_feed(url: str) -> Any:
     """
     Fetch and parse an RSS feed from the specified URL.
+
+    This function sends a GET request to the provided URL, retrieves the RSS feed content,
+    and parses it using the feedparser library.
+
+    Args:
+        url (str): The URL of the RSS feed to fetch.
+
+    Returns:
+        Any: The parsed RSS feed.
     """
     headers = {"User-Agent": get_user_agent()}
     response = requests.get(url, headers=headers)
@@ -424,24 +476,44 @@ def fetch_rss_feed(url: str) -> Any:
 def parse_rss_feed_entry(entry: FeedParserDict) -> Optional[Dict[str, str]]:
     """
     Parse an RSS feed entry to extract company information and filing details.
+
+    This function takes an RSS feed entry, extracts the form type, company name, CIK, filed date,
+    and accession number, and returns them in a dictionary.
+
+    Args:
+        entry (FeedParserDict): A single RSS feed entry to parse.
+
+    Returns:
+        Optional[Dict[str, str]]: A dictionary containing parsed information, or None if parsing fails.
     """
-    title_parts = entry.title.split(" - ")
-    form_type, company_info = title_parts[0], title_parts[1]
-    company_name, cik = company_info.split(" (")[0], company_info.split(" (")[1].split(")")[0]
-    filed_date = re.search(r"<b>Filed:</b> (\d{4}-\d{2}-\d{2})", entry.summary).group(1)
-    acc_no = re.search(r"<b>AccNo:</b> ([\d-]+)", entry.summary).group(1)
-    return {
-        "company_name": company_name,
-        "form_type": form_type,
-        "cik": cik,
-        "filed_date": filed_date,
-        "acc_no": acc_no
-    }
+    try:
+        title_parts = entry.title.split(" - ")
+        form_type, company_info = title_parts[0], title_parts[1]
+        company_name = company_info.split(" (")[0]
+        cik = company_info.split(" (")[1].split(")")[0]
+        filed_date = re.search(r"<b>Filed:</b> (\d{4}-\d{2}-\d{2})", entry.summary).group(1)
+        acc_no = re.search(r"<b>AccNo:</b> ([\d-]+)", entry.summary).group(1)
+        return {
+            "company_name": company_name,
+            "form_type": form_type,
+            "cik": cik,
+            "filed_date": filed_date,
+            "acc_no": acc_no
+        }
+    except (IndexError, AttributeError) as e:
+        print(f"Error parsing entry: {e}")
+        return None
 
 
 def get_rss_feed_entries() -> List[Optional[Dict[str, str]]]:
     """
     Fetch RSS feed entries from predefined URLs and parse each entry.
+
+    This function retrieves RSS feeds from predefined SEC URLs, parses each entry to extract relevant information,
+    and returns a list of parsed entries.
+
+    Returns:
+        List[Optional[Dict[str, str]]]: A list of dictionaries containing parsed RSS feed entries.
     """
     urls = [
         "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&CIK=&type=13f-hr&owner=include&count=20&output=atom",
@@ -450,8 +522,10 @@ def get_rss_feed_entries() -> List[Optional[Dict[str, str]]]:
     ]
     entries = []
     for url in urls:
+        # Fetch and parse the RSS feed
         feed = fetch_rss_feed(url)
         for entry in feed.entries:
+            # Parse each RSS feed entry
             parsed_entry = parse_rss_feed_entry(entry)
             entries.append(parsed_entry)
     return entries
@@ -460,39 +534,72 @@ def get_rss_feed_entries() -> List[Optional[Dict[str, str]]]:
 def validate_unique_email(form: FlaskForm, field: StringField) -> None:
     """
     Validate that the email address provided in the form is unique and not already in use.
+
+    Args:
+        form (FlaskForm): The form containing the email field to validate.
+        field (StringField): The email field to validate.
+
+    Raises:
+        ValidationError: If the email is already in use by another user.
     """
+    # Check if the email is different from the default (indicating a change) and already exists in the database
     if field.data != form.email.default and User.query.filter_by(email=field.data).first():
         raise ValidationError('Email already in use.')
 
 
-def validate_unique_phone_number(form, field):
+def validate_unique_phone_number(form: FlaskForm, field: StringField) -> None:
     """
-    Validates that the phone number is unique in the database, if provided and changed.
+    Validate that the phone number is unique in the database, if provided and changed.
+
+    Args:
+        form (FlaskForm): The form containing the phone number field to validate.
+        field (StringField): The phone number field to validate.
+
+    Raises:
+        ValidationError: If the phone number is already in use by another user.
     """
-    if field.data:  # Check if phone number field is not empty
+    # Check if phone number field is not empty
+    if field.data:
         existing_user = User.query.filter_by(phone_number=field.data).first()
+        # Ensure the phone number is not in use by another user (not the current user)
         if existing_user and existing_user.id != current_user.id:
             raise ValidationError('Phone number already in use.')
 
 
-def validate_phone_format(form, field):
+def validate_phone_format(form: FlaskForm, field: StringField) -> None:
     """
     Validates that the input matches the expected phone number format.
+
+    Args:
+        form (FlaskForm): The form containing the phone number field to validate.
+        field (StringField): The phone number field to validate.
+
+    Raises:
+        ValidationError: If the phone number does not match the expected format.
     """
     phone_regex = re.compile(r'^\+\d{9,14}$')
-    if field.data and not phone_regex.match(field.data):  # Check only if field has data
+    # Check if the phone number field has data and matches the expected format
+    if field.data and not phone_regex.match(field.data):
         raise ValidationError("Invalid phone number. It must start with + and be 10 to 15 characters long.")
 
 
-def validate_name_surname_format_only_str(form, field):
+def validate_name_surname_format_only_str(form: FlaskForm, field: StringField) -> None:
     """
     Validates that the input for name and surname fields contains only letters.
+
+    Args:
+        form (FlaskForm): The form containing the name or surname field to validate.
+        field (StringField): The name or surname field to validate.
+
+    Raises:
+        ValidationError: If the field contains non-letter characters.
     """
-    if field.data and not re.match(r"^[A-Za-z]+$", field.data):  # Check only if field has data
+    # Check if the name or surname field has data and contains only letters
+    if field.data and not re.match(r"^[A-Za-z]+$", field.data):
         raise ValidationError("Field must contain only letters.")
 
 
-def validate_match(form, field1, field2):
+def validate_match(form: FlaskForm, field1: str, field2: str) -> None:
     """
     Validator to ensure that two fields in a WTForms form match.
 
@@ -504,22 +611,45 @@ def validate_match(form, field1, field2):
     Raises:
         ValidationError: If the fields do not match.
     """
+    # Check if the values of the two fields match
     if form[field1].data != form[field2].data:
         raise ValidationError(f"{field1.capitalize()}s must match.")
 
 
-def validate_current_password(form, field) -> None:
+def validate_current_password(form: FlaskForm, field: StringField) -> None:
     """
     Validator to validate the current password.
 
+    This function checks if the provided current password matches the user's existing password in the database.
+
+    Args:
+        form (FlaskForm): The form containing the current password field to validate.
+        field (StringField): The current password field to validate.
+
+    Raises:
+        ValidationError: If the current password is invalid.
     """
-    if form.current_password.data and not check_password_hash(form.user.password, form.current_password.data):
+    if form.current_password.data and not check_password_hash(current_user.password, form.current_password.data):
         raise ValidationError('Invalid current password.')
 
 
 def validate_password_strong_password(form: FlaskForm, field: StringField) -> None:
     """
     Validate that the provided password meets the strength criteria.
+
+    This function checks if the provided password meets the following strength criteria:
+    - At least 8 characters long
+    - Contains at least one uppercase letter
+    - Contains at least one lowercase letter
+    - Contains at least one digit
+    - Contains at least one special character
+
+    Args:
+        form (FlaskForm): The form containing the password field to validate.
+        field (StringField): The password field to validate.
+
+    Raises:
+        ValidationError: If the password does not meet the strength criteria.
     """
     password = field.data
 
@@ -538,7 +668,15 @@ def validate_password_strong_password(form: FlaskForm, field: StringField) -> No
 def validate_admin_pin(form: FlaskForm, admin_pin: StringField) -> None:
     """
     Validate that the provided admin PIN matches the expected PIN from environment variables.
-    """
 
+    This function checks if the provided admin PIN matches the expected PIN stored in the environment variables.
+
+    Args:
+        form (FlaskForm): The form containing the admin PIN field to validate.
+        admin_pin (StringField): The admin PIN field to validate.
+
+    Raises:
+        ValidationError: If the admin PIN is invalid.
+    """
     if admin_pin.data != os.getenv('ADMIN_PIN'):
         raise ValidationError('Invalid admin PIN.')
