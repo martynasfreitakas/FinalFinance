@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from .database import db
 from flask import render_template, flash, redirect, url_for, request, Blueprint, send_from_directory, current_app
@@ -190,6 +191,7 @@ def add_more_submissions(cik: str) -> object:
     return render_template('fund_details.html',
                            fund=fund, submissions=all_submissions, year=datetime.now().year)
 
+
 @routes.route('/fund_favorites')
 @login_required
 def fund_favorites() -> str:
@@ -247,9 +249,10 @@ def add_to_favorites(cik: str) -> object:
 
     return redirect(url_for('routes.fund_search'))
 
-@routes.route('/remove_from_favorites/<int:fund_id>', methods=['POST'])
+
+@routes.route('/remove_from_favorites/<uuid:fund_id>', methods=['POST'])
 @login_required
-def remove_from_favorites(fund_id: int) -> object:
+def remove_from_favorites(fund_id: uuid.UUID) -> object:
     """
     Route for removing a fund from the user's favorites.
 
@@ -257,7 +260,7 @@ def remove_from_favorites(fund_id: int) -> object:
     It checks if the user exists and if the fund is in the user's favorites.
 
     Args:
-        fund_id (int): The ID of the fund to be removed from favorites.
+        fund_id (uuid.UUID): The ID of the fund to be removed from favorites.
 
     Returns:
         Response: Redirects to the fund favorites page.
@@ -269,7 +272,11 @@ def remove_from_favorites(fund_id: int) -> object:
         return redirect(url_for('routes.login'))
 
     # Retrieve the favorite entry for the fund
-    favorite_entry = AddFundToFavorites.query.filter_by(user_id=user.id, fund_id=fund_id).first()
+    favorite_entry = AddFundToFavorites.query.filter_by(
+        user_id=user.id,
+        fund_id=fund_id
+    ).first()
+
     if favorite_entry:
         # Remove the fund from the user's favorites
         db.session.delete(favorite_entry)
@@ -279,6 +286,7 @@ def remove_from_favorites(fund_id: int) -> object:
         flash('Fund not found in favorites.', 'error')
 
     return redirect(url_for('routes.fund_favorites'))
+
 
 @routes.route('/submission_details/<accession_number>')
 @login_required
@@ -410,28 +418,36 @@ def fund_details(cik: str) -> str:
                 merged_holdings_df['New Company'] = ~merged_holdings_df['Company Name'].isin(previous_companies)
 
                 # Calculate change in share amount and percentage
-                merged_holdings_df['Change Amount'] = merged_holdings_df['Share Amount'] - merged_holdings_df['Previous Share Amount']
-                merged_holdings_df['Change Percentage'] = (merged_holdings_df['Change Amount'] / merged_holdings_df['Previous Share Amount']) * 100
+                merged_holdings_df['Change Amount'] = merged_holdings_df['Share Amount'] - merged_holdings_df[
+                    'Previous Share Amount']
+                merged_holdings_df['Change Percentage'] = (merged_holdings_df['Change Amount'] / merged_holdings_df[
+                    'Previous Share Amount']) * 100
                 merged_holdings_df['Change Percentage'] = merged_holdings_df['Change Percentage'].fillna(100)
 
                 # Determine change status
                 merged_holdings_df['Change Status'] = 'No Change'
-                merged_holdings_df.loc[merged_holdings_df['Share Amount'] > merged_holdings_df['Previous Share Amount'], 'Change Status'] = 'Increased'
-                merged_holdings_df.loc[merged_holdings_df['Share Amount'] < merged_holdings_df['Previous Share Amount'], 'Change Status'] = 'Decreased'
-                merged_holdings_df.loc[merged_holdings_df['Previous Share Amount'].isna(), 'Change Status'] = 'New Investment'
+                merged_holdings_df.loc[merged_holdings_df['Share Amount'] > merged_holdings_df[
+                    'Previous Share Amount'], 'Change Status'] = 'Increased'
+                merged_holdings_df.loc[merged_holdings_df['Share Amount'] < merged_holdings_df[
+                    'Previous Share Amount'], 'Change Status'] = 'Decreased'
+                merged_holdings_df.loc[
+                    merged_holdings_df['Previous Share Amount'].isna(), 'Change Status'] = 'New Investment'
 
                 # Find companies that were in previous but not in current
-                previous_holdings_not_in_current = previous_holdings_df[~previous_holdings_df['Company Name'].isin(current_holdings_df['Company Name'])].copy()
+                previous_holdings_not_in_current = previous_holdings_df[
+                    ~previous_holdings_df['Company Name'].isin(current_holdings_df['Company Name'])].copy()
 
                 # Set share amount to 0 for these companies
                 previous_holdings_not_in_current['Share Amount'] = 0
                 previous_holdings_not_in_current['Change Status'] = 'Position Closed'
                 previous_holdings_not_in_current['New Company'] = False
-                previous_holdings_not_in_current['Change Amount'] = -previous_holdings_not_in_current['Previous Share Amount']
+                previous_holdings_not_in_current['Change Amount'] = -previous_holdings_not_in_current[
+                    'Previous Share Amount']
                 previous_holdings_not_in_current['Change Percentage'] = -100
 
                 # Append these rows to the merged holdings DataFrame
-                merged_holdings_df = pd.concat([merged_holdings_df, previous_holdings_not_in_current], ignore_index=True)
+                merged_holdings_df = pd.concat([merged_holdings_df, previous_holdings_not_in_current],
+                                               ignore_index=True)
 
             except KeyError as e:
                 flash(f'Error accessing "Previous Share Amount" column: {e}')
@@ -447,11 +463,11 @@ def fund_details(cik: str) -> str:
             merged_holdings_df['Change Percentage'] = 100
 
         # Round necessary columns and handle new investments
-        merged_holdings_df['Value (USD)'] = merged_holdings_df['Value (USD)'].astype(int)
-        merged_holdings_df['Share Amount'] = merged_holdings_df['Share Amount'].astype(int)
+        merged_holdings_df['Value (USD)'] = merged_holdings_df['Value (USD)'].fillna(0).astype(int)
+        merged_holdings_df['Share Amount'] = merged_holdings_df['Share Amount'].fillna(0).astype(int)
         merged_holdings_df['Previous Share Amount'] = merged_holdings_df['Previous Share Amount'].fillna(0).astype(int)
-        merged_holdings_df['Change Amount'] = merged_holdings_df['Change Amount'].astype(int)
-        merged_holdings_df['Change Percentage'] = merged_holdings_df['Change Percentage'].round(1)
+        merged_holdings_df['Change Amount'] = merged_holdings_df['Change Amount'].fillna(0).astype(int)
+        merged_holdings_df['Change Percentage'] = merged_holdings_df['Change Percentage'].fillna(0).round(1)
 
         holdings_df = merged_holdings_df
 
@@ -459,7 +475,9 @@ def fund_details(cik: str) -> str:
     holdings_list = holdings_df.to_dict(orient='records')
 
     # Render the fund details page
-    return render_template('fund_details.html', fund=fund, submissions=all_submissions, newest_holdings=holdings_list, year=datetime.now().year)
+    return render_template('fund_details.html', fund=fund, submissions=all_submissions, newest_holdings=holdings_list,
+                           year=datetime.now().year)
+
 
 @routes.route('/signup', methods=['GET', 'POST'])
 def signup() -> str:
@@ -577,6 +595,7 @@ def profile() -> str:
 
     return render_template('profile.html', form=form, user=current_user)
 
+
 @routes.route('/monitor', methods=['GET', 'POST'])
 @login_required
 def monitor() -> str:
@@ -680,7 +699,8 @@ def monitor() -> str:
         merged_holdings_df[col] = merged_holdings_df[col].astype(int)
 
     # Reorder columns to show Company Name, then Previous Share Amounts, then Share Amount
-    columns_order = ['Company Name'] + [col for col in merged_holdings_df.columns if 'Previous Share Amount' in col][::-1] + ['Share Amount']
+    columns_order = ['Company Name'] + [col for col in merged_holdings_df.columns if 'Previous Share Amount' in col][
+                                       ::-1] + ['Share Amount']
     merged_holdings_df = merged_holdings_df[columns_order]
 
     # Check for companies with current Share Amount of 0 but non-zero previous amounts
@@ -717,6 +737,7 @@ def admin_home() -> str:
     form = LoginForm()
     return render_template('admin/admin_home.html', year=datetime.now().year, form=form)
 
+
 @routes.route('/admin/login', methods=['GET', 'POST'])
 def admin_login() -> str:
     """
@@ -748,6 +769,7 @@ def admin_login() -> str:
             flash('Login unsuccessful. Please check your credentials.', 'error')
 
     return render_template('admin/admin_login.html', title='Admin Login', form=form)
+
 
 @routes.route('/admin/signup', methods=['GET', 'POST'])
 def admin_signup() -> str:
@@ -803,6 +825,7 @@ def admin_signup() -> str:
 
     return render_template('admin/admin_signup.html', title='Admin Sign Up', form=form)
 
+
 @routes.route('/admin/logout')
 @login_required
 def admin_logout() -> object:
@@ -817,6 +840,7 @@ def admin_logout() -> object:
     logout_user()
     flash('You have been logged out.', 'info')
     return redirect(url_for('routes.admin_login'))
+
 
 @routes.route('/admin/dashboard')
 @login_required
