@@ -35,7 +35,6 @@ def home():
     return render_template('home.html', well_known_funds=well_known_funds,
                            rss_feed_entries=rss_feed_entries, image_filename=image_filename, year=datetime.now().year)
 
-
 @routes.route('/static/images/<path:filename>')
 def custom_static(filename):
     file_path = os.path.join('static', 'images', filename)
