@@ -195,7 +195,7 @@ def add_more_submissions(cik: str) -> object:
                            fund=fund, submissions=all_submissions, year=datetime.now().year)
 
 
-@routes.route('/fund_favorites')
+@routes.route('/fund_favorites', methods=['GET', 'POST'])
 @login_required
 def fund_favorites() -> str:
     """
@@ -207,9 +207,147 @@ def fund_favorites() -> str:
         str: The rendered HTML template for the favorite funds page.
     """
     favorite_funds = current_user.favorite_funds
+    monitored_cik = request.form.get('monitored_cik', None)
+
+    if not monitored_cik and favorite_funds:
+        monitored_cik = favorite_funds[0].fund.cik
+
+    fund = None
+    all_submissions = []
+    holdings_list = []
+
+    if monitored_cik:
+        # Fetch the fund and its submissions from the database
+        fund = Submission.query.filter_by(cik=monitored_cik).first()
+
+        if fund:
+            # Fetch all submissions for the monitored CIK
+            all_submissions = Submission.query.filter_by(cik=monitored_cik).order_by(
+                Submission.filed_of_date.desc()).all()
+            # Fetch all holdings based on submissions
+            all_holdings = []
+            if all_submissions:
+                all_accession_numbers = [submission.accession_number for submission in all_submissions]
+                all_holdings = FundHoldings.query.filter(FundHoldings.accession_number.in_(all_accession_numbers)).all()
+
+            # Convert SQLAlchemy results to a pandas DataFrame
+            holdings_df = pd.DataFrame(
+                [(holding.company_name, holding.value_usd, holding.share_amount, holding.accession_number)
+                 for holding in all_holdings],
+                columns=['Company Name', 'Value (USD)', 'Share Amount', 'Accession Number']
+            )
+
+            # Sort DataFrame by Company Name and Accession Number
+            holdings_df.sort_values(by=['Company Name', 'Accession Number'], ascending=[True, False], inplace=True)
+
+            # Get the most recent and previous accessions
+            most_recent_accession = all_submissions[0].accession_number if all_submissions else None
+            previous_accession = all_submissions[1].accession_number if len(all_submissions) > 1 else None
+
+            if most_recent_accession:
+                # Get current holdings
+                current_holdings_df = holdings_df[holdings_df['Accession Number'] == most_recent_accession].copy()
+                if previous_accession:
+                    # Get previous holdings
+                    previous_holdings_df = holdings_df[holdings_df['Accession Number'] == previous_accession].copy()
+
+                    try:
+                        # Merge current and previous holdings on 'Company Name'
+                        merged_holdings_df = pd.merge(
+                            current_holdings_df,
+                            previous_holdings_df[['Company Name', 'Share Amount']],
+                            on='Company Name',
+                            how='left',
+                            suffixes=('', '_Previous')
+                        )
+                        merged_holdings_df.rename(columns={'Share Amount_Previous': 'Previous Share Amount'},
+                                                  inplace=True)
+
+                        # Check for new companies
+                        previous_companies = previous_holdings_df['Company Name'].unique()
+                        merged_holdings_df['New Company'] = ~merged_holdings_df['Company Name'].isin(previous_companies)
+
+                        # Calculate change in share amount and percentage
+                        merged_holdings_df['Change Amount'] = merged_holdings_df['Share Amount'] - merged_holdings_df[
+                            'Previous Share Amount'].fillna(0)
+
+                        # Explicitly set Change Percentage for new investments
+                        def calculate_change_percentage(row):
+                            if row['Previous Share Amount'] == 0 and row['Share Amount'] > 0:
+                                return 100.0
+                            elif row['Previous Share Amount'] == 0:
+                                return 0.0
+                            else:
+                                return (row['Change Amount'] / row['Previous Share Amount']) * 100
+
+                        merged_holdings_df['Change Percentage'] = merged_holdings_df.apply(calculate_change_percentage,
+                                                                                           axis=1)
+
+                        # Determine change status
+                        merged_holdings_df['Change Status'] = 'No Change'
+                        merged_holdings_df.loc[merged_holdings_df['Share Amount'] > merged_holdings_df[
+                            'Previous Share Amount'], 'Change Status'] = 'Increased'
+                        merged_holdings_df.loc[merged_holdings_df['Share Amount'] < merged_holdings_df[
+                            'Previous Share Amount'], 'Change Status'] = 'Decreased'
+                        merged_holdings_df.loc[
+                            merged_holdings_df['Previous Share Amount'].isna(), 'Change Status'] = 'New Investment'
+
+                        # Find companies that were in previous but not in current
+                        previous_holdings_not_in_current = previous_holdings_df[
+                            ~previous_holdings_df['Company Name'].isin(current_holdings_df['Company Name'])].copy()
+
+                        # Set share amount to 0 for these companies
+                        previous_holdings_not_in_current['Share Amount'] = 0
+                        previous_holdings_not_in_current['Change Status'] = 'Position Closed'
+                        previous_holdings_not_in_current['New Company'] = False
+                        previous_holdings_not_in_current['Change Amount'] = -previous_holdings_not_in_current[
+                            'Share Amount']
+                        previous_holdings_not_in_current['Change Percentage'] = -100
+
+                        # Append these rows to the merged holdings DataFrame
+                        merged_holdings_df = pd.concat([merged_holdings_df, previous_holdings_not_in_current],
+                                                       ignore_index=True)
+
+                    except KeyError:
+                        # Handle case when 'Previous Share Amount' is missing
+                        current_holdings_df['Previous Share Amount'] = 0
+                        current_holdings_df['New Company'] = True
+                        current_holdings_df['Change Status'] = 'New Investment'
+                        current_holdings_df['Change Amount'] = current_holdings_df['Share Amount']
+                        current_holdings_df['Change Percentage'] = 100.0
+                        merged_holdings_df = current_holdings_df
+
+                else:
+                    # Handle case when there is no previous accession
+                    current_holdings_df['Previous Share Amount'] = 0
+                    current_holdings_df['New Company'] = True
+                    current_holdings_df['Change Status'] = 'New Investment'
+                    current_holdings_df['Change Amount'] = current_holdings_df['Share Amount']
+                    current_holdings_df['Change Percentage'] = 100.0
+                    merged_holdings_df = current_holdings_df
+
+                # Round necessary columns and handle new investments
+                merged_holdings_df['Value (USD)'] = merged_holdings_df['Value (USD)'].fillna(0).astype(int)
+                merged_holdings_df['Share Amount'] = merged_holdings_df['Share Amount'].fillna(0).astype(int)
+                merged_holdings_df['Previous Share Amount'] = merged_holdings_df['Previous Share Amount'].fillna(
+                    0).astype(int)
+                merged_holdings_df['Change Amount'] = merged_holdings_df['Change Amount'].fillna(0).astype(int)
+                merged_holdings_df['Change Percentage'] = merged_holdings_df['Change Percentage'].fillna(0).round(1)
+
+                holdings_df = merged_holdings_df
+
+                # Convert DataFrame back to list of dictionaries for rendering in template
+                holdings_list = holdings_df.to_dict(orient='records')
 
     # Render the favorite funds page
-    return render_template('fund_favorites.html', favorite_funds=favorite_funds, year=datetime.now().year)
+    return render_template('fund_favorites.html', favorite_funds=favorite_funds, year=datetime.now().year,
+                           fund=fund, submissions=all_submissions, newest_holdings=holdings_list,
+                           monitored_cik=monitored_cik)
+
+    # Render the favorite funds page
+    return render_template('fund_favorites.html', favorite_funds=favorite_funds, year=datetime.now().year,
+                           fund=fund, submissions=all_submissions, newest_holdings=holdings_list,
+                           monitored_cik=monitored_cik)
 
 
 @routes.route('/add_to_favorites/<cik>', methods=['POST'])

@@ -160,7 +160,6 @@ nav ul li a:hover::after {
 
 .submission-list th, .submission-list td {
     border: 1px solid #dddddd;
-    text-align: left;
     padding: 8px;
 }
 
@@ -203,8 +202,10 @@ footer {
 .search-button {
     cursor: pointer;
     background-color: #ff671d;
-    color}
+    color: #fff;
+}
 
+/* Columns Container */
 .columns-container {
     display: flex;
     justify-content: space-between;
@@ -232,3 +233,11 @@ footer {
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
 }
 
+/* Centered Table */
+.centered-table th, .centered-table td {
+    text-align: center;
+}
+
+.centered-table td.company-name {
+    text-align: left;
+}

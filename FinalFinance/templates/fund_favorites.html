@@ -1,7 +1,7 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
 {% block title %}
-My Favorite Funds
+    My Favorite Funds
 {% endblock %}
 
 {% block content %}
@@ -17,25 +17,128 @@ My Favorite Funds
     {% endif %}
 {% endwith %}
 
-<div class="favorite-funds-block">
-    <h2>Favorite Funds</h2>
-    {% if current_user.is_authenticated %}
-    {% if favorite_funds %}
-    <ul>
-        {% for favorite in favorite_funds %}
-        <li>
-            <a href="#">{{ favorite.fund.fund_name }}: {{ favorite.fund.cik }}</a>
-            <form action="{{ url_for('routes.remove_from_favorites', fund_id=favorite.fund.id) }}" method="post" style="display: inline;">
-                <button type="submit">Remove from Favorites</button>
+<div class="fund-details-container">
+    <div class="left-column">
+        <div class="favorite-funds-block">
+            <h2>Favorite Funds</h2>
+            {% if current_user.is_authenticated %}
+            {% if favorite_funds %}
+            <form id="monitor-form" action="{{ url_for('routes.fund_favorites') }}" method="POST">
+                <table border="1">
+                    <thead>
+                        <tr>
+                            <th>Fund Name</th>
+                            <th>CIK</th>
+                            <th>Monitor</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for favorite in favorite_funds %}
+                        <tr>
+                            <td><a href="{{ url_for('routes.fund_details', cik=favorite.fund.cik) }}">{{ favorite.fund.fund_name }}</a></td>
+                            <td>{{ favorite.fund.cik }}</td>
+                            <td>
+                                <input type="radio" name="monitored_cik" value="{{ favorite.fund.cik }}"
+                                       {% if favorite.fund.cik == monitored_cik %}checked{% endif %}
+                                       onchange="document.getElementById('monitor-form').submit()">
+                            </td>
+                            <td>
+                                <form action="{{ url_for('routes.remove_from_favorites', fund_id=favorite.fund.id) }}" method="post" style="display: inline;">
+                                    <button type="submit">Remove from Favorites</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </form>
-        </li>
-        {% endfor %}
-    </ul>
-    {% else %}
-    <p>No favorite funds added yet.</p>
-    {% endif %}
-    {% else %}
-    <p>Please <a href="{{ url_for('routes.login') }}">log in</a> to view favorite funds.</p>
-    {% endif %}
+            {% else %}
+            <p>No favorite funds added yet.</p>
+            {% endif %}
+            {% else %}
+            <p>Please <a href="{{ url_for('routes.login') }}">log in</a> to view favorite funds.</p>
+            {% endif %}
+        </div>
+
+        {% if fund %}
+        <div class="fund-details-left">
+            <h2>Newest Submission Details</h2>
+            <div class="newest-holdings">
+                <p>Filed Date: {{ submissions[0].filed_of_date }}</p>
+                <p>Period: {{ submissions[0].period_of_portfolio }}</p>
+                <p>Portfolio value (USD): {{ submissions[0].fund_portfolio_value }}</p>
+                <p>Submission Type: {{ submissions[0].submission_type }}</p>
+                <p>Accession Number: {{ submissions[0].accession_number }}</p>
+            </div>
+
+            <h2>Fund Holdings</h2>
+            <table border="1" class="centered-table">
+                <thead>
+                    <tr>
+                        <th>Company Name</th>
+                        <th>Value (USD)</th>
+                        <th>Share Amount</th>
+                        <th>Previous Share Amount</th>
+                        <th>Change Status</th>
+                        <th>Change Amount</th>
+                        <th>Change Percentage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for holding in newest_holdings %}
+                    <tr>
+                        <td class="company-name">{{ holding['Company Name'] }}</td>
+                        <td>{{ holding['Value (USD)'] }}</td>
+                        <td>{{ holding['Share Amount'] }}</td>
+                        <td>{{ holding['Previous Share Amount'] }}</td>
+                        <td>{{ holding['Change Status'] }}</td>
+                        <td>{{ holding['Change Amount'] }}</td>
+                        <td>{{ holding['Change Percentage'] }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="right-column">
+        {% if fund %}
+        <div class="add-submissions">
+            <h2>Add More Submissions</h2>
+            <form action="{{ url_for('routes.add_more_submissions', cik=fund.cik) }}" method="post">
+                <input type="date" name="start_date" required>
+                <input type="date" name="end_date" required>
+                <input type="submit" value="Add More Submissions">
+            </form>
+        </div>
+
+        <div class="submission-list">
+            <h2>Submissions</h2>
+            <table border="1">
+                <thead>
+                    <tr>
+                        <th>Filed Date</th>
+                        <th>Period</th>
+                        <th>Submission Type</th>
+                        <th>Accession Number</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for submission in submissions %}
+                    <tr>
+                        <td><a href="{{ url_for('routes.submission_details', accession_number=submission.accession_number) }}">
+                            {{ submission.filed_of_date }}</a></td>
+                        <td>{{ submission.period_of_portfolio }}</td>
+                        <td>{{ submission.submission_type }}</td>
+                        <td>{{ submission.accession_number }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}

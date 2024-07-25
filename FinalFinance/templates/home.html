@@ -50,7 +50,7 @@ FinalFinance
             <tbody>
             {% for fund_name, cik in well_known_funds.items() %}
             <tr>
-                <td>{{ fund_name }}</td>
+                <td><a href="{{ url_for('routes.fund_details', cik=cik) }}">{{ fund_name }}</a></td>
                 <td>{{ cik }}</td>
                 <td>
                     <form action="{{ url_for('routes.add_to_favorites', cik=cik) }}" method="post"
