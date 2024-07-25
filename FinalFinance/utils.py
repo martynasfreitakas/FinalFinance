@@ -5,12 +5,12 @@ from flask_wtf import FlaskForm
 from sqlalchemy import func
 from wtforms.fields.simple import StringField
 
-from models import Submission, FundHoldings, FundData
+from .models import Submission, FundHoldings, FundData
 from bs4 import BeautifulSoup
 from sec_edgar_downloader import Downloader
 from dotenv import load_dotenv
 import requests
-from database import db
+from .database import db
 import shutil
 from datetime import datetime
 import os
@@ -27,7 +27,7 @@ from io import BytesIO
 
 import feedparser
 from wtforms.validators import ValidationError
-from models import User
+from .models import User
 from werkzeug.security import check_password_hash
 from flask_login import current_user
 
@@ -380,8 +380,11 @@ def save_plot_to_file(
                     '1wk', '1mo', '3mo'.
     """
     try:
+        print(f"Generating plot for {ticker_symbol} with period {period} and interval {interval}")
+
         ticker = Ticker(ticker_symbol)
         hist = ticker.history(period=period, interval=interval)
+        print(f"Retrieved historical data for {ticker_symbol}")
 
         fig = Figure(figsize=(10, 5))
         ax = fig.subplots()
@@ -393,11 +396,14 @@ def save_plot_to_file(
         ax.grid(True)
 
         if filename:
+            print(f"Saving plot to file: {filename}")
             fig.savefig(filename)
             plt.close(fig)
+            print(f"Plot saved successfully to {filename}")
             return filename
 
         plt.close(fig)
+        print("No filename provided; plot not saved")
         return None
 
     except Exception as e:

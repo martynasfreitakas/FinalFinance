@@ -1,10 +1,10 @@
 from datetime import datetime
-from database import db
+from .database import db
 from flask import render_template, flash, redirect, url_for, request, Blueprint, send_from_directory, current_app
-from forms import SignUpForm, LoginForm, UpdateProfileForm, AdminSignUpForm
-from models import User, FundData, Submission, AddFundToFavorites, FundHoldings, AdminUser
+from .forms import SignUpForm, LoginForm, UpdateProfileForm, AdminSignUpForm
+from .models import User, FundData, Submission, AddFundToFavorites, FundHoldings, AdminUser
 import pandas as pd
-from utils import edgar_downloader_from_sec, get_fund_lists, save_plot_to_file, get_rss_feed_entries
+from .utils import edgar_downloader_from_sec, get_fund_lists, save_plot_to_file, get_rss_feed_entries
 from flask_login import login_user, logout_user, current_user, login_required
 import re
 import os
@@ -18,10 +18,11 @@ routes = Blueprint('routes', __name__)
 def home():
     well_known_funds = get_fund_lists()
     rss_feed_entries = get_rss_feed_entries()
-    ticker_symbol = 'spy'  # You can change this to any ticker symbol you want to plot
+    ticker_symbol = 'spy'
     today_date = datetime.now().strftime('%Y-%m-%d')
     image_filename = f'plot_{ticker_symbol}_{today_date}.png'
-    image_path = os.path.join('static', 'images', image_filename)
+    image_path = os.path.join('FinalFinance', 'static', 'images', image_filename)
+    print(f"Saving plot to: {image_path}")
 
     # Ensure the static/images directory exists
     os.makedirs(os.path.dirname(image_path), exist_ok=True)
@@ -37,6 +38,11 @@ def home():
 
 @routes.route('/static/images/<path:filename>')
 def custom_static(filename):
+    file_path = os.path.join('static', 'images', filename)
+    if os.path.exists(file_path):
+        print(f"Serving file: {file_path}")
+    else:
+        print(f"File not found: {file_path}")
     return send_from_directory(os.path.join('static', 'images'), filename)
 
 
@@ -146,7 +152,6 @@ def add_to_favorites(cik):
 @routes.route('/remove_from_favorites/<int:fund_id>', methods=['POST'])
 @login_required
 def remove_from_favorites(fund_id):
-
     user = User.query.filter_by(id=current_user.id).first()
     if not user:
         flash('User not found.', 'error')

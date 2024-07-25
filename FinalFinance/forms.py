@@ -1,7 +1,7 @@
 from wtforms import StringField, PasswordField, SubmitField, EmailField
 from flask_wtf import FlaskForm
 from wtforms.validators import DataRequired, Email, Optional, EqualTo
-from utils import (validate_phone_format, validate_name_surname_format_only_str, validate_unique_phone_number,
+from .utils import (validate_phone_format, validate_name_surname_format_only_str, validate_unique_phone_number,
                    validate_password_strong_password, validate_admin_pin)
 
 

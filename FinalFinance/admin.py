@@ -1,8 +1,8 @@
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 from flask_login import current_user
-from models import User, FundData, Submission, FundHoldings, AddFundToFavorites, AdminUser
-from database import db
+from .models import User, FundData, Submission, FundHoldings, AddFundToFavorites, AdminUser
+from .database import db
 
 
 class AdminModelView(ModelView):

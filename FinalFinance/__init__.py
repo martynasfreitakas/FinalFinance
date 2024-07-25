@@ -5,10 +5,10 @@ import os
 import uuid
 
 from .routes import routes
-from config import Config
-from database import init_db
-from models import User, AdminUser
-from admin import init_admin
+from .config import Config
+from .database import init_db
+from .models import User, AdminUser
+from .admin import init_admin
 
 import logging
 import logging.config
@@ -24,7 +24,7 @@ def create_app():
         logging.basicConfig(level=logging.INFO)
         logging.error(f"Error configuring logging: {e}")
 
-    app = Flask(__name__, template_folder='templates')
+    app = Flask(__name__, template_folder='templates', static_folder='static')
     app.config.from_object(Config)
 
     init_db(app)
