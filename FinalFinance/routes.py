@@ -14,7 +14,6 @@ from werkzeug.security import check_password_hash
 routes = Blueprint('routes', __name__)
 
 
-# def my_routes(app):
 @routes.route('/')
 def home():
     well_known_funds = get_fund_lists()
