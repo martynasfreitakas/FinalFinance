@@ -4,11 +4,61 @@
     <meta charset="UTF-8">
     <title>{% block title %}FinalFinance{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script>
+        const europeanMarketOpen = new Date();
+        europeanMarketOpen.setHours(10, 0, 0, 0);  // 10:00 AM
+        const europeanMarketClose = new Date();
+        europeanMarketClose.setHours(18, 30, 0, 0); // 6:30 PM
+
+        const usMarketOpen = new Date();
+        usMarketOpen.setHours(16, 30, 0, 0);  // 4:30 PM
+        const usMarketClose = new Date();
+        usMarketClose.setHours(23, 0, 0, 0);  // 11:00 PM
+
+        function updateMarketStatus() {
+            const now = new Date();
+            let statusMessage = "";
+
+            if (now.getDay() === 0 || now.getDay() === 6) { // Check if it's weekend
+                statusMessage = "Markets are closed for the weekend.";
+            } else {
+                statusMessage = getStatus(now, europeanMarketOpen, europeanMarketClose, "European");
+                statusMessage += " | ";
+                statusMessage += getStatus(now, usMarketOpen, usMarketClose, "US");
+            }
+
+            document.getElementById("market-status").innerText = statusMessage;
+        }
+
+        function getStatus(now, openTime, closeTime, marketName) {
+            if (now >= openTime && now < closeTime) {
+                return `${marketName} market is OPEN. Closes in ${getTimeDifference(now, closeTime)}`;
+            } else {
+                let nextOpen = new Date(openTime);
+                if (now > closeTime) {
+                    nextOpen.setDate(now.getDate() + 1); // Set to the next day
+                }
+                return `${marketName} market is CLOSED. Opens in ${getTimeDifference(now, nextOpen)}`;
+            }
+        }
+
+        function getTimeDifference(now, futureTime) {
+            const diffMs = futureTime - now;
+            const diffHrs = Math.floor((diffMs % 86400000) / 3600000);
+            const diffMins = Math.round(((diffMs % 86400000) % 3600000) / 60000);
+            return `${diffHrs} hours and ${diffMins} minutes`;
+        }
+
+        setInterval(updateMarketStatus, 60000); // Update every minute
+        document.addEventListener('DOMContentLoaded', (event) => {
+            updateMarketStatus(); // Initial call
+        });
+    </script>
 </head>
 <body>
     <div class="top-header">
         {% if current_user.is_authenticated %}
-            <p>European markets open: 10:00 &emsp;&emsp;&emsp;| &emsp;&emsp;&emsp; US markets open: 16:30 </p>
+            <p id="market-status">Loading market status...</p>
         {% else %}
             <p>Signup to check financial data&emsp;<a href="{{ url_for('routes.signup') }}">Register Now</a></p>
         {% endif %}
