@@ -22,7 +22,7 @@ This project involves creating a Flask web application that allows users to sear
 
 - **Home Page**: View and search for mutual fund investments. The page displays well-known funds and RSS feed updates about the latest submissions from SEC.gov.
 - **Fund Search**: Perform searches for mutual funds.
-- **Monitor**: View information about the latest fund submissions, including a table of current fund positions and the ability to track how a fund's portfolio changes over the last five submissions. Users can understand whether a fund has maintained, added, or liquidated positions based on share amounts. Funds can be managed using radio buttons, with the fund list sourced from favorites.
+- **Monitor**: View information about the latest fund submissions, including a table of current fund positions and track how a fund's portfolio changes over the last five submissions. Users can understand whether a fund has maintained, added, or liquidated positions based on share amounts. Manage fund information using radio buttons, with the fund list coming from favorites.
 - **Favorites**: Add and manage favorite funds for quick access.
 - **Profile**: Update your profile information and manage your account.
 
@@ -47,19 +47,18 @@ This project involves creating a Flask web application that allows users to sear
 1. **Clone the repository**:
     ```bash
     git clone https://github.com/martynasfreitakas/FinalFinance.git
+    ```
+
+2. **Navigate to the project directory**:
+    ```bash
     cd FinalProject
     ```
 
-2. **Create and activate a virtual environment**:
+3. **Create and activate a virtual environment**:
     ```bash
     python -m venv .venv
     .\.venv\Scripts\activate  # On Windows
     # For macOS/Linux, use: source .venv/bin/activate
-    ```
-
-3. **Navigate to the `FinalFinance` directory**:
-    ```bash
-    cd FinalFinance
     ```
 
 4. **Install the dependencies**:
@@ -68,7 +67,7 @@ This project involves creating a Flask web application that allows users to sear
     ```
 
 5. **Set up environment variables**:
-    Create a `.env` file in the `FinalFinance` directory and add the following environment variables:
+    Create a `.env` file in the `FinalProject` directory and add the following environment variables:
     ```env
     DATABASE_URL=postgresql://your_database_url
     SECRET_KEY=your_secret_key
@@ -94,4 +93,4 @@ This project involves creating a Flask web application that allows users to sear
 
 ## License
 
-This project is available for use with the author's permission. Please contact the author for more information regarding usage and permissions.
+Please contact the author for more information regarding usage and permissions.
