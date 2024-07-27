@@ -52,7 +52,7 @@ class TestingConfig(Config):
     """
     ENV = 'testing'
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL')  # Dedicated PostgreSQL test database
+    SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL')  # Dedicated PostgreSQL tests database
     WTF_CSRF_ENABLED = False  # Disable CSRF protection for easier testing
     DEBUG = True
 

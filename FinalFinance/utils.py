@@ -120,7 +120,7 @@ def download_and_store_all_companies_names_and_cik_from_edgar() -> None:
         # Handle merging of duplicate CIK entries
         results = db.session.query(
             FundData.cik,
-            func.group_concat(FundData.fund_name, ', ').label('fund_names')
+            func.string_agg(FundData.fund_name, ', ').label('fund_names')
         ).group_by(FundData.cik).having(func.count(FundData.cik) > 1).all()
 
         for number_duplicates, result in enumerate(results, start=1):
@@ -396,11 +396,8 @@ def get_fund_lists() -> Dict[str, str]:
     return well_known_funds
 
 
-def save_plot_to_file(
-        ticker_symbol: str = 'SPY',
-        period: str = '1y',
-        interval: str = '1d',
-        filename: Optional[str] = None) -> Optional[str]:
+def save_plot_to_file(ticker_symbol: str = 'SPY', period: str = '1y', interval: str = '1d',
+                      filename: Optional[str] = None) -> Optional[str]:
     """
     Generate a plot of historical stock prices for a given ticker symbol and save it to a file.
 
@@ -433,7 +430,7 @@ def save_plot_to_file(
         ax.plot(hist.index, hist['Close'], label=ticker_symbol)
         ax.set_xlabel('Date')
         ax.set_ylabel('Close Price')
-        ax.set_title(f'{ticker_symbol} Historical Data ({period} period)')
+        ax.set_title(f'{ticker_symbol} Historical Data ({period} period, {interval} interval)')
         ax.legend()
         ax.grid(True)
 

@@ -1,10 +1,11 @@
 import unittest
 from FinalFinance import create_app, db
-from FinalFinance.models import User, FundData, Submission, FundHoldings, AddFundToFavorites
+from FinalFinance.models import User, FundData, AddFundToFavorites, Submission, FundHoldings
 from datetime import date
 
 
 class ModelsTestCase(unittest.TestCase):
+
     def setUp(self):
         self.app = create_app('testing')
         self.app_context = self.app.app_context()
@@ -36,13 +37,13 @@ class ModelsTestCase(unittest.TestCase):
         self.assertEqual(fund.cik, '0000000088')
 
     def test_submission_creation(self):
-        fund = FundData(fund_name='Test Fund', cik='0000000000')
+        fund = FundData(fund_name='Test Fund', cik='0006546460')
         db.session.add(fund)
         db.session.commit()
 
         submission = Submission(
-            cik='0000000000',
-            company_name='Best Company',
+            cik='0006546460',
+            company_name='Test Company',
             submission_type='NPORT-P',
             filed_of_date=date.today(),
             accession_number='0000000000-21-000000',
@@ -51,7 +52,7 @@ class ModelsTestCase(unittest.TestCase):
         )
         db.session.add(submission)
         db.session.commit()
-        self.assertEqual(submission.company_name, 'Best Company')
+        self.assertEqual(submission.company_name, 'Test Company')
 
     def test_fund_holdings_creation(self):
         fund = FundData(fund_name='Test Fund', cik='0000000000')
