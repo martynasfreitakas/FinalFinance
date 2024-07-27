@@ -48,7 +48,7 @@
             <div class="newest-holdings">
                 <p>Filed Date: {{ newest_submission.filed_of_date }}</p>
                 <p>Period: {{ newest_submission.period_of_portfolio }}</p>
-                <p>Portfolio value (USD): {{ newest_submission.fund_portfolio_value }}</p>
+                <p>Portfolio value (USD): {{ "%.2f"|format(newest_submission.fund_portfolio_value) }}</p>
                 <p>Submission Type: {{ newest_submission.submission_type }}</p>
                 <p>Accession Number: {{ newest_submission.accession_number }}</p>
             </div>
@@ -81,10 +81,10 @@
                 </tbody>
             </table>
         {% else %}
-            <p>No holdings found for this fund.</p>
+            <p>Add Fund to favorites to get stats.</p>
         {% endif %}
 
     {% else %}
-        <p>No fund details found.</p>
+        <p>Add Fund to favorites to get stats.</p>
     {% endif %}
 {% endblock %}

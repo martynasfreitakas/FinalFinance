@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Any, List
 
+import pandas as pd
 from feedparser import FeedParserDict
 from flask_wtf import FlaskForm
 from sqlalchemy import func
@@ -677,3 +678,161 @@ def validate_admin_pin(form: FlaskForm, admin_pin: StringField) -> None:
     """
     if admin_pin.data != os.getenv('ADMIN_PIN'):
         raise ValidationError('Invalid admin PIN.')
+
+
+def fetch_and_process_holdings(cik, start_date=None, end_date=None):
+    """
+    Fetch and process holdings data for a given CIK.
+    """
+    # Fetch the fund and its submissions from the database
+    fund = Submission.query.filter_by(cik=cik).first()
+
+    if not fund:
+        # If no fund found, fetch from SEC EDGAR and update the database
+        edgar_downloader_from_sec(cik, start_date=start_date, end_date=end_date)
+        fund = Submission.query.filter_by(cik=cik).first()
+        if not fund:
+            return None, [], []
+
+    # Fetch all submissions for the fund
+    all_submissions = Submission.query.filter_by(cik=cik).order_by(Submission.filed_of_date.desc()).all()
+
+    # Fetch all holdings for the fund based on submissions
+    all_holdings = []
+    if all_submissions:
+        all_accession_numbers = [submission.accession_number for submission in all_submissions]
+        all_holdings = FundHoldings.query.filter(FundHoldings.accession_number.in_(all_accession_numbers)).all()
+
+    # Convert SQLAlchemy results to a pandas DataFrame
+    holdings_df = pd.DataFrame(
+        [(holding.company_name, holding.value_usd, holding.share_amount, holding.accession_number)
+         for holding in all_holdings],
+        columns=['Company Name', 'Value (USD)', 'Share Amount', 'Accession Number']
+    )
+
+    # Sort DataFrame by Company Name and Accession Number
+    holdings_df.sort_values(by=['Company Name', 'Accession Number'], ascending=[True, False], inplace=True)
+
+    return fund, all_submissions, holdings_df
+
+
+def process_holdings_dataframe(holdings_df, all_submissions):
+    """
+    Process the holdings DataFrame to compare current and previous holdings.
+    """
+    most_recent_accession = all_submissions[0].accession_number if all_submissions else None
+    previous_accession = all_submissions[1].accession_number if len(all_submissions) > 1 else None
+
+    if not most_recent_accession:
+        return []
+
+    current_holdings_df = holdings_df[holdings_df['Accession Number'] == most_recent_accession].copy()
+    if previous_accession:
+        previous_holdings_df = holdings_df[holdings_df['Accession Number'] == previous_accession].copy()
+
+        try:
+            merged_holdings_df = pd.merge(
+                current_holdings_df,
+                previous_holdings_df[['Company Name', 'Share Amount']],
+                on='Company Name',
+                how='left',
+                suffixes=('', '_Previous')
+            )
+            merged_holdings_df.rename(columns={'Share Amount_Previous': 'Previous Share Amount'}, inplace=True)
+
+            previous_companies = previous_holdings_df['Company Name'].unique()
+            merged_holdings_df['New Company'] = ~merged_holdings_df['Company Name'].isin(previous_companies)
+
+            merged_holdings_df['Change Amount'] = merged_holdings_df['Share Amount'] - merged_holdings_df[
+                'Previous Share Amount'].fillna(0)
+
+            def calculate_change_percentage(row):
+                if pd.isna(row['Previous Share Amount']) or row['Previous Share Amount'] == 0:
+                    if row['Share Amount'] > 0:
+                        return 100.0
+                    else:
+                        return 0.0
+                else:
+                    return (row['Change Amount'] / row['Previous Share Amount']) * 100
+
+            merged_holdings_df['Change Percentage'] = merged_holdings_df.apply(calculate_change_percentage, axis=1)
+
+            merged_holdings_df['Change Status'] = 'No Change'
+            merged_holdings_df.loc[merged_holdings_df['Share Amount'] > merged_holdings_df[
+                'Previous Share Amount'], 'Change Status'] = 'Increased'
+            merged_holdings_df.loc[merged_holdings_df['Share Amount'] < merged_holdings_df[
+                'Previous Share Amount'], 'Change Status'] = 'Decreased'
+            merged_holdings_df.loc[
+                merged_holdings_df['Previous Share Amount'].isna(), 'Change Status'] = 'New Investment'
+
+            previous_holdings_not_in_current = previous_holdings_df[
+                ~previous_holdings_df['Company Name'].isin(current_holdings_df['Company Name'])].copy()
+
+            previous_holdings_not_in_current['Share Amount'] = 0
+            previous_holdings_not_in_current['Change Status'] = 'Position Closed'
+            previous_holdings_not_in_current['New Company'] = False
+            previous_holdings_not_in_current['Change Amount'] = -previous_holdings_not_in_current['Share Amount']
+            previous_holdings_not_in_current['Change Percentage'] = -100
+
+            merged_holdings_df = pd.concat([merged_holdings_df, previous_holdings_not_in_current],
+                                           ignore_index=True)
+
+        except KeyError:
+            current_holdings_df['Previous Share Amount'] = 0
+            current_holdings_df['New Company'] = True
+            current_holdings_df['Change Status'] = 'New Investment'
+            current_holdings_df['Change Amount'] = current_holdings_df['Share Amount']
+            current_holdings_df['Change Percentage'] = 100.0
+            merged_holdings_df = current_holdings_df
+
+    else:
+        current_holdings_df['Previous Share Amount'] = 0
+        current_holdings_df['New Company'] = True
+        current_holdings_df['Change Status'] = 'New Investment'
+        current_holdings_df['Change Amount'] = current_holdings_df['Share Amount']
+        current_holdings_df['Change Percentage'] = 100.0
+        merged_holdings_df = current_holdings_df
+
+    merged_holdings_df['Value (USD)'] = merged_holdings_df['Value (USD)'].fillna(0).astype(int)
+    merged_holdings_df['Share Amount'] = merged_holdings_df['Share Amount'].fillna(0).astype(int)
+    merged_holdings_df['Previous Share Amount'] = merged_holdings_df['Previous Share Amount'].fillna(0).astype(int)
+    merged_holdings_df['Change Amount'] = merged_holdings_df['Change Amount'].fillna(0).astype(int)
+    merged_holdings_df['Change Percentage'] = merged_holdings_df['Change Percentage'].fillna(0).round(1)
+
+    return merged_holdings_df.to_dict(orient='records')
+
+
+def process_monitor_holdings_dataframe(holdings_df, all_submissions):
+    """
+    Process the holdings DataFrame specifically for the monitor view.
+    """
+    accession_numbers = [submission.accession_number for submission in all_submissions]
+    periods = [submission.period_of_portfolio for submission in all_submissions]
+
+    merged_holdings_df = pd.DataFrame(columns=['Company Name'])
+
+    if accession_numbers:
+        for i, (accession_number, period) in enumerate(zip(accession_numbers, periods)):
+            temp_df = holdings_df[holdings_df['Accession Number'] == accession_number].copy()
+            column_name = f'{period}' if i != 0 else 'Newest'
+            temp_df.rename(columns={'Share Amount': column_name}, inplace=True)
+            merged_holdings_df = pd.merge(
+                merged_holdings_df,
+                temp_df[['Company Name', column_name]],
+                on='Company Name',
+                how='outer'
+            )
+
+    merged_holdings_df.fillna(0, inplace=True)
+
+    for col in merged_holdings_df.columns[1:]:
+        merged_holdings_df[col] = merged_holdings_df[col].astype(int)
+
+    columns_order = ['Company Name'] + [col for col in merged_holdings_df.columns if
+                                        col not in ['Company Name', 'Newest']][::-1] + ['Newest']
+    merged_holdings_df = merged_holdings_df[columns_order]
+
+    condition = (merged_holdings_df['Newest'] == 0) & (merged_holdings_df.iloc[:, 1:-1].sum(axis=1) != 0)
+    zero_share_but_previous_non_zero = merged_holdings_df[condition]
+
+    return merged_holdings_df.to_dict(orient='records')

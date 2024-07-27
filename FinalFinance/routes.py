@@ -1,14 +1,12 @@
 import uuid
 from datetime import datetime
 
-import numpy as np
-
 from .database import db
 from flask import render_template, flash, redirect, url_for, request, Blueprint, send_from_directory, current_app
 from .forms import SignUpForm, LoginForm, UpdateProfileForm, AdminSignUpForm
 from .models import User, FundData, Submission, AddFundToFavorites, FundHoldings, AdminUser
-import pandas as pd
-from .utils import edgar_downloader_from_sec, get_fund_lists, save_plot_to_file, get_rss_feed_entries
+from .utils import edgar_downloader_from_sec, get_fund_lists, save_plot_to_file, get_rss_feed_entries, \
+    fetch_and_process_holdings, process_holdings_dataframe, process_monitor_holdings_dataframe
 from flask_login import login_user, logout_user, current_user, login_required
 import re
 import os
@@ -197,15 +195,7 @@ def add_more_submissions(cik: str) -> object:
 
 @routes.route('/fund_favorites', methods=['GET', 'POST'])
 @login_required
-def fund_favorites() -> str:
-    """
-    Route for displaying the user's favorite funds.
-
-    This function renders a page showing all the funds that the current user has marked as favorite.
-
-    Returns:
-        str: The rendered HTML template for the favorite funds page.
-    """
+def fund_favorites():
     favorite_funds = current_user.favorite_funds
     monitored_cik = request.form.get('monitored_cik', None)
 
@@ -217,134 +207,16 @@ def fund_favorites() -> str:
     holdings_list = []
 
     if monitored_cik:
-        # Fetch the fund and its submissions from the database
-        fund = Submission.query.filter_by(cik=monitored_cik).first()
+        fund, all_submissions, holdings_df = fetch_and_process_holdings(monitored_cik)
+        if not fund:
+            flash('This Fund does not provide holding filings.')
+            return redirect(url_for('routes.fund_favorites'))
 
-        if fund:
-            # Fetch all submissions for the monitored CIK
-            all_submissions = Submission.query.filter_by(cik=monitored_cik).order_by(
-                Submission.filed_of_date.desc()).all()
-            # Fetch all holdings based on submissions
-            all_holdings = []
-            if all_submissions:
-                all_accession_numbers = [submission.accession_number for submission in all_submissions]
-                all_holdings = FundHoldings.query.filter(FundHoldings.accession_number.in_(all_accession_numbers)).all()
+        holdings_list = process_holdings_dataframe(holdings_df, all_submissions)
 
-            # Convert SQLAlchemy results to a pandas DataFrame
-            holdings_df = pd.DataFrame(
-                [(holding.company_name, holding.value_usd, holding.share_amount, holding.accession_number)
-                 for holding in all_holdings],
-                columns=['Company Name', 'Value (USD)', 'Share Amount', 'Accession Number']
-            )
+    if not favorite_funds:
+        flash('Add Fund to favorites to get stats.')
 
-            # Sort DataFrame by Company Name and Accession Number
-            holdings_df.sort_values(by=['Company Name', 'Accession Number'], ascending=[True, False], inplace=True)
-
-            # Get the most recent and previous accessions
-            most_recent_accession = all_submissions[0].accession_number if all_submissions else None
-            previous_accession = all_submissions[1].accession_number if len(all_submissions) > 1 else None
-
-            if most_recent_accession:
-                # Get current holdings
-                current_holdings_df = holdings_df[holdings_df['Accession Number'] == most_recent_accession].copy()
-                if previous_accession:
-                    # Get previous holdings
-                    previous_holdings_df = holdings_df[holdings_df['Accession Number'] == previous_accession].copy()
-
-                    try:
-                        # Merge current and previous holdings on 'Company Name'
-                        merged_holdings_df = pd.merge(
-                            current_holdings_df,
-                            previous_holdings_df[['Company Name', 'Share Amount']],
-                            on='Company Name',
-                            how='left',
-                            suffixes=('', '_Previous')
-                        )
-                        merged_holdings_df.rename(columns={'Share Amount_Previous': 'Previous Share Amount'},
-                                                  inplace=True)
-
-                        # Check for new companies
-                        previous_companies = previous_holdings_df['Company Name'].unique()
-                        merged_holdings_df['New Company'] = ~merged_holdings_df['Company Name'].isin(previous_companies)
-
-                        # Calculate change in share amount and percentage
-                        merged_holdings_df['Change Amount'] = merged_holdings_df['Share Amount'] - merged_holdings_df[
-                            'Previous Share Amount'].fillna(0)
-
-                        # Explicitly set Change Percentage for new investments
-                        def calculate_change_percentage(row):
-                            if row['Previous Share Amount'] == 0 and row['Share Amount'] > 0:
-                                return 100.0
-                            elif row['Previous Share Amount'] == 0:
-                                return 0.0
-                            else:
-                                return (row['Change Amount'] / row['Previous Share Amount']) * 100
-
-                        merged_holdings_df['Change Percentage'] = merged_holdings_df.apply(calculate_change_percentage,
-                                                                                           axis=1)
-
-                        # Determine change status
-                        merged_holdings_df['Change Status'] = 'No Change'
-                        merged_holdings_df.loc[merged_holdings_df['Share Amount'] > merged_holdings_df[
-                            'Previous Share Amount'], 'Change Status'] = 'Increased'
-                        merged_holdings_df.loc[merged_holdings_df['Share Amount'] < merged_holdings_df[
-                            'Previous Share Amount'], 'Change Status'] = 'Decreased'
-                        merged_holdings_df.loc[
-                            merged_holdings_df['Previous Share Amount'].isna(), 'Change Status'] = 'New Investment'
-
-                        # Find companies that were in previous but not in current
-                        previous_holdings_not_in_current = previous_holdings_df[
-                            ~previous_holdings_df['Company Name'].isin(current_holdings_df['Company Name'])].copy()
-
-                        # Set share amount to 0 for these companies
-                        previous_holdings_not_in_current['Share Amount'] = 0
-                        previous_holdings_not_in_current['Change Status'] = 'Position Closed'
-                        previous_holdings_not_in_current['New Company'] = False
-                        previous_holdings_not_in_current['Change Amount'] = -previous_holdings_not_in_current[
-                            'Share Amount']
-                        previous_holdings_not_in_current['Change Percentage'] = -100
-
-                        # Append these rows to the merged holdings DataFrame
-                        merged_holdings_df = pd.concat([merged_holdings_df, previous_holdings_not_in_current],
-                                                       ignore_index=True)
-
-                    except KeyError:
-                        # Handle case when 'Previous Share Amount' is missing
-                        current_holdings_df['Previous Share Amount'] = 0
-                        current_holdings_df['New Company'] = True
-                        current_holdings_df['Change Status'] = 'New Investment'
-                        current_holdings_df['Change Amount'] = current_holdings_df['Share Amount']
-                        current_holdings_df['Change Percentage'] = 100.0
-                        merged_holdings_df = current_holdings_df
-
-                else:
-                    # Handle case when there is no previous accession
-                    current_holdings_df['Previous Share Amount'] = 0
-                    current_holdings_df['New Company'] = True
-                    current_holdings_df['Change Status'] = 'New Investment'
-                    current_holdings_df['Change Amount'] = current_holdings_df['Share Amount']
-                    current_holdings_df['Change Percentage'] = 100.0
-                    merged_holdings_df = current_holdings_df
-
-                # Round necessary columns and handle new investments
-                merged_holdings_df['Value (USD)'] = merged_holdings_df['Value (USD)'].fillna(0).astype(int)
-                merged_holdings_df['Share Amount'] = merged_holdings_df['Share Amount'].fillna(0).astype(int)
-                merged_holdings_df['Previous Share Amount'] = merged_holdings_df['Previous Share Amount'].fillna(
-                    0).astype(int)
-                merged_holdings_df['Change Amount'] = merged_holdings_df['Change Amount'].fillna(0).astype(int)
-                merged_holdings_df['Change Percentage'] = merged_holdings_df['Change Percentage'].fillna(0).round(1)
-
-                holdings_df = merged_holdings_df
-
-                # Convert DataFrame back to list of dictionaries for rendering in template
-                holdings_list = holdings_df.to_dict(orient='records')
-
-    # Render the favorite funds page
-    return render_template('fund_favorites.html', favorite_funds=favorite_funds, year=datetime.now().year,
-                           fund=fund, submissions=all_submissions, newest_holdings=holdings_list,
-                           monitored_cik=monitored_cik)
-
-    # Render the favorite funds page
     return render_template('fund_favorites.html', favorite_funds=favorite_funds, year=datetime.now().year,
                            fund=fund, submissions=all_submissions, newest_holdings=holdings_list,
                            monitored_cik=monitored_cik)
@@ -365,28 +237,29 @@ def add_to_favorites(cik: str) -> object:
     Returns:
         Response: Redirects to the fund search page.
     """
-    # Retrieve the current user
-    user = User.query.filter_by(id=current_user.id).first()
-    if not user:
-        flash('User not found.')
-        return redirect(url_for('routes.login'))
+    try:
+        user = User.query.filter_by(id=current_user.id).first()
+        if not user:
+            flash('User not found.')
+            return redirect(url_for('routes.login'))
 
-    # Retrieve the fund by CIK
-    fund = FundData.query.filter_by(cik=cik).first()
-    if not fund:
-        flash('Fund not found.')
-        return redirect(url_for('routes.fund_search'))
+        fund = FundData.query.filter_by(cik=cik).first()
+        if not fund:
+            flash('Fund not found.')
+            return redirect(url_for('routes.fund_search'))
 
-    # Check if the fund is already in the user's favorites
-    favorite = AddFundToFavorites.query.filter_by(user_id=user.id, fund_id=fund.id).first()
-    if favorite:
-        flash('Fund is already in favorites.')
-    else:
-        # Add the fund to the user's favorites
-        favorite = AddFundToFavorites(user_id=user.id, fund_id=fund.id)
-        db.session.add(favorite)
-        db.session.commit()
-        flash('Fund added to favorites.')
+        favorite = AddFundToFavorites.query.filter_by(user_id=user.id, fund_id=fund.id).first()
+        if favorite:
+            flash('Fund is already in favorites.')
+        else:
+            favorite = AddFundToFavorites(user_id=user.id, fund_id=fund.id)
+            db.session.add(favorite)
+            db.session.commit()
+            flash('Fund added to favorites.')
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while adding the fund to favorites.')
+        current_app.logger.error(f"Error adding fund to favorites: {str(e)}")
 
     return redirect(url_for('routes.fund_search'))
 
@@ -406,23 +279,17 @@ def remove_from_favorites(fund_id: uuid.UUID) -> object:
     Returns:
         Response: Redirects to the fund favorites page.
     """
-    # Retrieve the current user
     user = User.query.filter_by(id=current_user.id).first()
     if not user:
         flash('User not found.', 'error')
         return redirect(url_for('routes.login'))
 
-    # Retrieve the favorite entry for the fund
-    favorite_entry = AddFundToFavorites.query.filter_by(
-        user_id=user.id,
-        fund_id=fund_id
-    ).first()
+    favorite_entry = AddFundToFavorites.query.filter_by(user_id=user.id, fund_id=fund_id).first()
 
     if favorite_entry:
-        # Remove the fund from the user's favorites
         db.session.delete(favorite_entry)
         db.session.commit()
-        flash('Fund removed from favorites successfully!', 'success')
+        flash(f'Fund {favorite_entry.fund.fund_name} removed from favorites successfully!', 'success')
     else:
         flash('Fund not found in favorites.', 'error')
 
@@ -461,19 +328,6 @@ def submission_details(accession_number: str) -> str:
 
 @routes.route('/fund_details/<cik>', methods=['GET', 'POST'])
 def fund_details(cik: str) -> str:
-    """
-    Route for displaying and managing fund details.
-
-    This function handles both GET and POST requests for the fund details page. It fetches
-    submissions and holdings for a fund identified by its CIK. Users can add more submissions
-    for a specific date range. The function also compares the most recent and previous holdings.
-
-    Args:
-        cik (str): The CIK of the fund.
-
-    Returns:
-        str: The rendered HTML template for the fund details page.
-    """
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
 
@@ -485,140 +339,22 @@ def fund_details(cik: str) -> str:
         end_date = None
 
     if request.method == 'POST':
-        # Get the start and end dates from the form
         start_date_str = request.form['start_date']
         end_date_str = request.form['end_date']
 
-        # Convert string dates to datetime objects
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
 
-        # Fetch new submissions from SEC EDGAR
         edgar_downloader_from_sec(cik, start_date=start_date, end_date=end_date)
-
         flash('Submissions added successfully.')
-
-        # Redirect to the fund details page
         return redirect(url_for('routes.fund_details', cik=cik))
 
-    # Fetch the fund and its submissions from the database
-    fund = Submission.query.filter_by(cik=cik).first()
-
+    fund, all_submissions, holdings_df = fetch_and_process_holdings(cik, start_date, end_date)
     if not fund:
-        # If no fund found, fetch from SEC EDGAR and update the database
-        edgar_downloader_from_sec(cik, start_date=start_date, end_date=end_date)
-        fund = Submission.query.filter_by(cik=cik).first()
-        if not fund:
-            flash('This Fund does not provide holding filings.')
-            return redirect(url_for('routes.fund_search'))
+        flash('This Fund does not provide holding filings.')
+        return redirect(url_for('routes.fund_search'))
 
-    # Fetch all submissions for the fund
-    all_submissions = Submission.query.filter_by(cik=cik).order_by(Submission.filed_of_date.desc()).all()
-
-    # Fetch all holdings for the fund based on submissions
-    all_holdings = []
-    if all_submissions:
-        all_accession_numbers = [submission.accession_number for submission in all_submissions]
-        all_holdings = FundHoldings.query.filter(FundHoldings.accession_number.in_(all_accession_numbers)).all()
-
-    # Convert SQLAlchemy results to a pandas DataFrame
-    holdings_df = pd.DataFrame(
-        [(holding.company_name, holding.value_usd, holding.share_amount, holding.accession_number)
-         for holding in all_holdings],
-        columns=['Company Name', 'Value (USD)', 'Share Amount', 'Accession Number']
-    )
-
-    # Sort DataFrame by Company Name and Accession Number
-    holdings_df.sort_values(by=['Company Name', 'Accession Number'], ascending=[True, False], inplace=True)
-
-    # Get the most recent and previous accessions
-    most_recent_accession = all_submissions[0].accession_number if all_submissions else None
-    previous_accession = all_submissions[1].accession_number if len(all_submissions) > 1 else None
-
-    if most_recent_accession:
-        # Get current holdings
-        current_holdings_df = holdings_df[holdings_df['Accession Number'] == most_recent_accession].copy()
-        if previous_accession:
-            # Get previous holdings
-            previous_holdings_df = holdings_df[holdings_df['Accession Number'] == previous_accession].copy()
-
-            try:
-                # Merge current and previous holdings on 'Company Name'
-                merged_holdings_df = pd.merge(
-                    current_holdings_df,
-                    previous_holdings_df[['Company Name', 'Share Amount']],
-                    on='Company Name',
-                    how='left',
-                    suffixes=('', '_Previous')
-                )
-                merged_holdings_df.rename(columns={'Share Amount_Previous': 'Previous Share Amount'}, inplace=True)
-
-                # Check for new companies
-                previous_companies = previous_holdings_df['Company Name'].unique()
-                merged_holdings_df['New Company'] = ~merged_holdings_df['Company Name'].isin(previous_companies)
-
-                # Calculate change in share amount and percentage
-                merged_holdings_df['Change Amount'] = merged_holdings_df['Share Amount'] - merged_holdings_df[
-                    'Previous Share Amount'].fillna(0)
-                merged_holdings_df['Change Percentage'] = merged_holdings_df.apply(
-                    lambda row: 100 if row['Previous Share Amount'] == 0 else (row['Change Amount'] / row[
-                        'Previous Share Amount']) * 100, axis=1)
-
-                # Determine change status
-                merged_holdings_df['Change Status'] = 'No Change'
-                merged_holdings_df.loc[merged_holdings_df['Share Amount'] > merged_holdings_df[
-                    'Previous Share Amount'], 'Change Status'] = 'Increased'
-                merged_holdings_df.loc[merged_holdings_df['Share Amount'] < merged_holdings_df[
-                    'Previous Share Amount'], 'Change Status'] = 'Decreased'
-                merged_holdings_df.loc[
-                    merged_holdings_df['Previous Share Amount'].isna(), 'Change Status'] = 'New Investment'
-
-                # Find companies that were in previous but not in current
-                previous_holdings_not_in_current = previous_holdings_df[
-                    ~previous_holdings_df['Company Name'].isin(current_holdings_df['Company Name'])].copy()
-
-                # Set share amount to 0 for these companies
-                previous_holdings_not_in_current['Share Amount'] = 0
-                previous_holdings_not_in_current['Change Status'] = 'Position Closed'
-                previous_holdings_not_in_current['New Company'] = False
-                previous_holdings_not_in_current['Change Amount'] = -previous_holdings_not_in_current['Share Amount']
-                previous_holdings_not_in_current['Change Percentage'] = -100
-
-                # Append these rows to the merged holdings DataFrame
-                merged_holdings_df = pd.concat([merged_holdings_df, previous_holdings_not_in_current],
-                                               ignore_index=True)
-
-            except KeyError:
-                # Handle case when 'Previous Share Amount' is missing
-                current_holdings_df['Previous Share Amount'] = 0
-                current_holdings_df['New Company'] = True
-                current_holdings_df['Change Status'] = 'New Investment'
-                current_holdings_df['Change Amount'] = current_holdings_df['Share Amount']
-                current_holdings_df['Change Percentage'] = 100
-                merged_holdings_df = current_holdings_df
-
-        else:
-            # Handle case when there is no previous accession
-            current_holdings_df['Previous Share Amount'] = 0
-            current_holdings_df['New Company'] = True
-            current_holdings_df['Change Status'] = 'New Investment'
-            current_holdings_df['Change Amount'] = current_holdings_df['Share Amount']
-            current_holdings_df['Change Percentage'] = 100
-            merged_holdings_df = current_holdings_df
-
-        # Round necessary columns and handle new investments
-        merged_holdings_df['Value (USD)'] = merged_holdings_df['Value (USD)'].fillna(0).astype(int)
-        merged_holdings_df['Share Amount'] = merged_holdings_df['Share Amount'].fillna(0).astype(int)
-        merged_holdings_df['Previous Share Amount'] = merged_holdings_df['Previous Share Amount'].fillna(0).astype(int)
-        merged_holdings_df['Change Amount'] = merged_holdings_df['Change Amount'].fillna(0).astype(int)
-        merged_holdings_df['Change Percentage'] = merged_holdings_df['Change Percentage'].fillna(0).round(1)
-
-        holdings_df = merged_holdings_df
-
-    # Convert DataFrame back to list of dictionaries for rendering in template
-    holdings_list = holdings_df.to_dict(orient='records')
-
-    # Render the fund details page
+    holdings_list = process_holdings_dataframe(holdings_df, all_submissions)
     return render_template('fund_details.html', fund=fund, submissions=all_submissions, newest_holdings=holdings_list,
                            year=datetime.now().year)
 
@@ -742,21 +478,12 @@ def profile() -> str:
 
 @routes.route('/monitor', methods=['GET', 'POST'])
 @login_required
-def monitor() -> str:
-    """
-    Route for monitoring user's favorite funds.
-
-    This function handles both GET and POST requests for the monitor page. It displays the user's favorite funds,
-    retrieves the latest submissions and holdings for a selected fund, and provides analysis on holdings changes.
-
-    Returns:
-        str: The rendered HTML template for the monitor page.
-    """
+def monitor():
     favorite_funds = current_user.favorite_funds
 
     if not favorite_funds:
-        flash('No favorite funds added yet.')
-        return render_template('monitor.html', year=datetime.now().year, message='No favorite funds added yet.')
+        # flash('Add Fund to favorites to get stats.')
+        return render_template('monitor.html', year=datetime.now().year, message='Add Fund to favorites to get stats.')
 
     fund_name_and_cik = [(favorite.fund.fund_name, favorite.fund.cik) for favorite in favorite_funds]
 
@@ -768,7 +495,6 @@ def monitor() -> str:
         monitored_cik = favorite_funds[0].fund.cik
 
     if request.method == 'POST':
-        # Get start and end dates from the form
         start_date_str = request.form.get('start_date', '2023-01-01')
         end_date_str = request.form.get('end_date', '2023-12-31')
 
@@ -782,83 +508,20 @@ def monitor() -> str:
     elif request.method == 'GET':
         monitored_cik = request.args.get('cik', monitored_cik)
 
-    # Fetch the fund and its submissions from the database
-    fund = Submission.query.filter_by(cik=monitored_cik).first()
+    fund, all_submissions, holdings_df = fetch_and_process_holdings(monitored_cik)
 
     if not fund:
-        try:
-            # Fetch new submissions from SEC EDGAR if fund not found
-            edgar_downloader_from_sec(monitored_cik, start_date=start_date, end_date=end_date)
-        except Exception as e:
-            flash(f'Error downloading SEC filings: {str(e)}')
-            return redirect(url_for('routes.monitor'))
+        flash('This Fund does not provide holding filings.')
+        return redirect(url_for('routes.monitor'))
 
-        fund = Submission.query.filter_by(cik=monitored_cik).first()
-
-        if not fund:
-            flash('This Fund does not provide holding filings.')
-            return redirect(url_for('routes.monitor'))
-
-    # Fetch all submissions for the monitored CIK
-    all_submissions = Submission.query.filter_by(cik=monitored_cik).order_by(Submission.filed_of_date.desc()).all()
-
+    holdings_list = process_monitor_holdings_dataframe(holdings_df, all_submissions)
     newest_submission = all_submissions[0] if all_submissions else None
 
-    # Fetch all holdings based on submissions
-    all_holdings = []
-    if all_submissions:
-        all_accession_numbers = [submission.accession_number for submission in all_submissions]
-        all_holdings = FundHoldings.query.filter(FundHoldings.accession_number.in_(all_accession_numbers)).all()
-
-    # Convert SQLAlchemy results to a pandas DataFrame
-    holdings_df = pd.DataFrame(
-        [(holding.company_name, holding.share_amount, holding.accession_number)
-         for holding in all_holdings],
-        columns=['Company Name', 'Share Amount', 'Accession Number']
-    )
-
-    # Sort DataFrame by Company Name and Accession Number
-    holdings_df.sort_values(by=['Company Name', 'Accession Number'], ascending=[True, False], inplace=True)
-
-    # Adjust the number of periods to include
-    number_of_periods = 10  # Adjust this number to increase or decrease the number of terms
-    accession_numbers = [submission.accession_number for submission in all_submissions[:number_of_periods]]
-    periods = [submission.period_of_portfolio for submission in all_submissions[:number_of_periods]]
-
-    merged_holdings_df = pd.DataFrame(columns=['Company Name'])
-
-    if accession_numbers:
-        for i, (accession_number, period) in enumerate(zip(accession_numbers, periods)):
-            temp_df = holdings_df[holdings_df['Accession Number'] == accession_number].copy()
-            column_name = f'{period}' if i != 0 else 'Newest'
-            temp_df.rename(columns={'Share Amount': column_name}, inplace=True)
-            merged_holdings_df = pd.merge(
-                merged_holdings_df,
-                temp_df[['Company Name', column_name]],
-                on='Company Name',
-                how='outer'
-            )
-
-    merged_holdings_df.fillna(0, inplace=True)
-
-    # Ensure all share amount columns are integers
-    for col in merged_holdings_df.columns[1:]:
-        merged_holdings_df[col] = merged_holdings_df[col].astype(int)
-
-    # Reorder columns to show Company Name, then Previous Share Amounts in reverse order, then Newest
-    columns_order = ['Company Name'] + [col for col in merged_holdings_df.columns if col not in ['Company Name', 'Newest']][::-1] + ['Newest']
-    merged_holdings_df = merged_holdings_df[columns_order]
-
-    # Check for companies with current Share Amount of 0 but non-zero previous amounts
-    condition = (merged_holdings_df['Newest'] == 0) & (merged_holdings_df.iloc[:, 1:-1].sum(axis=1) != 0)
-    zero_share_but_previous_non_zero = merged_holdings_df[condition]
-
-    holdings_list = merged_holdings_df.to_dict(orient='records')
-
-    # Render the monitor page
     return render_template('monitor.html',
-                           fund=fund, newest_holdings=holdings_list,
-                           year=datetime.now().year, fund_details=fund_name_and_cik,
+                           fund=fund,
+                           newest_holdings=holdings_list,
+                           year=datetime.now().year,
+                           fund_details=fund_name_and_cik,
                            favorite_funds=favorite_funds,
                            monitored_cik=monitored_cik,
                            submissions=all_submissions,
