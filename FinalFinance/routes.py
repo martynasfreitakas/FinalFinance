@@ -298,17 +298,23 @@ def remove_from_favorites(fund_id: uuid.UUID) -> object:
     Returns:
         Response: Redirects to the fund favorites page.
     """
-    user = User.query.filter_by(id=current_user.id).first()
+    # Query the user and eagerly load the favorite funds and their associated funds
+    user = User.query.filter_by(id=current_user.id).options(
+        db.joinedload(User.favorite_funds).joinedload(AddFundToFavorites.fund)
+    ).first()
+
     if not user:
         flash('User not found.', 'error')
         return redirect(url_for('routes.login'))
 
-    favorite_entry = AddFundToFavorites.query.filter_by(user_id=user.id, fund_id=fund_id).first()
+    # Find the favorite entry with the specified fund_id
+    favorite_entry = next((f for f in user.favorite_funds if f.fund_id == fund_id), None)
 
     if favorite_entry:
+        fund_name = favorite_entry.fund.fund_name  # Access fund_name before deleting the entry
         db.session.delete(favorite_entry)
         db.session.commit()
-        flash(f'Fund {favorite_entry.fund.fund_name} removed from favorites successfully!', 'success')
+        flash(f'Fund {fund_name} removed from favorites successfully!', 'success')
     else:
         flash('Fund not found in favorites.', 'error')
 
