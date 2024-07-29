@@ -725,8 +725,8 @@ def fetch_and_process_holdings(cik, start_date=None, end_date=None):
         if not fund:
             return None, [], []
 
-    # Fetch all submissions for the fund
-    all_submissions = Submission.query.filter_by(cik=cik).order_by(Submission.filed_of_date.desc()).all()
+    # Fetch all submissions for the fund and order by accession number descending
+    all_submissions = Submission.query.filter_by(cik=cik).order_by(Submission.accession_number.desc()).all()
 
     # Fetch all holdings for the fund based on submissions
     all_holdings = []
@@ -741,16 +741,17 @@ def fetch_and_process_holdings(cik, start_date=None, end_date=None):
         columns=['Company Name', 'Value (USD)', 'Share Amount', 'Accession Number']
     )
 
-    # Create a dictionary to track the count of reports for each quarter
-    submissions_by_date = defaultdict(list)
+    # Sort submissions by period and accession number
+    submissions_by_period = defaultdict(list)
     for submission in all_submissions:
-        submissions_by_date[submission.filed_of_date].append(submission)
+        submissions_by_period[submission.period_of_portfolio].append(submission)
 
     processed_submissions = []
-    for date in sorted(submissions_by_date.keys(), reverse=True):
-        submissions = submissions_by_date[date]
-        for i, submission in enumerate(submissions, start=1):
-            period_with_suffix = f"{submission.period_of_portfolio}_{i}"
+    for period, submissions in submissions_by_period.items():
+        # Sort by accession number in descending order
+        submissions.sort(key=lambda x: x.accession_number, reverse=True)
+        for i, submission in enumerate(submissions):
+            period_with_suffix = f"{period}_{len(submissions) - i}"
             processed_submissions.append({
                 'filed_of_date': submission.filed_of_date,
                 'period_of_portfolio': period_with_suffix,
@@ -759,11 +760,11 @@ def fetch_and_process_holdings(cik, start_date=None, end_date=None):
                 'fund_portfolio_value': submission.fund_portfolio_value
             })
 
-    # Sort processed_submissions by Accession Number in descending order
-    processed_submissions.sort(key=lambda x: x['accession_number'], reverse=True)
-
     # Sort DataFrame by Company Name and Accession Number
     holdings_df.sort_values(by=['Company Name', 'Accession Number'], ascending=[True, False], inplace=True)
+
+    # Sort processed_submissions by filed_of_date and accession_number for display purposes
+    processed_submissions.sort(key=lambda x: (x['filed_of_date'], x['accession_number']), reverse=True)
 
     return fund, processed_submissions, holdings_df
 

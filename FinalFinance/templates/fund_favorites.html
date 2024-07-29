@@ -122,6 +122,10 @@
             {% endif %}
         </div>
     </div>
+    {% else %}
+    <p>No favorite funds available. Add funds to your favorites to get stats.</p>
     {% endif %}
+{% else %}
+<p>You need to log in to view your favorite funds.</p>
 {% endif %}
 {% endblock %}
