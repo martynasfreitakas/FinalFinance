@@ -488,10 +488,40 @@ def parse_rss_feed_entry(entry: FeedParserDict) -> Optional[Dict[str, str]]:
     try:
         title_parts = entry.title.split(" - ")
         form_type, company_info = title_parts[0], title_parts[1]
+
+        # Extract company name
         company_name = company_info.split(" (")[0]
-        cik = company_info.split(" (")[1].split(")")[0]
-        filed_date = re.search(r"<b>Filed:</b> (\d{4}-\d{2}-\d{2})", entry.summary).group(1)
-        acc_no = re.search(r"<b>AccNo:</b> ([\d-]+)", entry.summary).group(1)
+
+        # Extract all content inside parentheses
+        parentheses_content = re.findall(r"\((.*?)\)", company_info)
+
+        # Initialize cik to None
+        cik = None
+
+        # Iterate over the parentheses content to find the CIK
+        for content in parentheses_content:
+            if content.startswith("000"):
+                cik = content
+                break
+
+        # If no CIK found, raise an error
+        if not cik:
+            raise ValueError("CIK number not found")
+
+        # Extract filed date
+        filed_date_match = re.search(r"<b>Filed:</b> (\d{4}-\d{2}-\d{2})", entry.summary)
+        if filed_date_match:
+            filed_date = filed_date_match.group(1)
+        else:
+            raise ValueError("Filed date not found")
+
+        # Extract accession number
+        acc_no_match = re.search(r"<b>AccNo:</b> ([\d-]+)", entry.summary)
+        if acc_no_match:
+            acc_no = acc_no_match.group(1)
+        else:
+            raise ValueError("Accession number not found")
+
         return {
             "company_name": company_name,
             "form_type": form_type,
@@ -499,7 +529,7 @@ def parse_rss_feed_entry(entry: FeedParserDict) -> Optional[Dict[str, str]]:
             "filed_date": filed_date,
             "acc_no": acc_no
         }
-    except (IndexError, AttributeError) as e:
+    except (IndexError, AttributeError, ValueError) as e:
         print(f"Error parsing entry: {e}")
         return None
 
@@ -827,45 +857,20 @@ def process_holdings_dataframe(holdings_df, all_submissions):
 def process_monitor_holdings_dataframe(holdings_df, all_submissions):
     """
     Process the holdings DataFrame specifically for the monitor view.
-
-    This function merges multiple holdings submissions into a single DataFrame, organizing
-    the data by company name and submission period. It also ensures that the periods are
-    uniquely identified even if multiple submissions exist within the same period.
-
-    Args:
-        holdings_df (pd.DataFrame): DataFrame containing holdings data.
-        all_submissions (list): List of dictionaries containing submission details.
-
-    Returns:
-        tuple: A tuple containing:
-            - list: List of dictionaries representing the processed holdings data.
-            - list: List of column headers for the merged DataFrame.
     """
-    # Extract accession numbers and periods from all_submissions
     accession_numbers = [submission['accession_number'] for submission in all_submissions]
     periods = [submission['period_of_portfolio'] for submission in all_submissions]
 
-    # Initialize the merged DataFrame with 'Company Name' column
     merged_holdings_df = pd.DataFrame(columns=['Company Name'])
 
-    # Dictionary to keep track of period suffixes
     period_counts = {}
-
-    # Loop through accession numbers and periods to merge data
     if accession_numbers:
         for i, (accession_number, period) in enumerate(zip(accession_numbers, periods)):
-            # Increment the period count for unique suffix
             period_counts[period] = period_counts.get(period, 0) + 1
             period_suffix = period_counts[period]
-
-            # Create the column name with or without suffix
             column_name = f'{period}_{period_suffix}' if period_suffix > 1 else period
-
-            # Filter and rename columns in the temporary DataFrame
             temp_df = holdings_df[holdings_df['Accession Number'] == accession_number].copy()
             temp_df.rename(columns={'Share Amount': column_name}, inplace=True)
-
-            # Merge the temporary DataFrame with the merged DataFrame
             merged_holdings_df = pd.merge(
                 merged_holdings_df,
                 temp_df[['Company Name', column_name]],
@@ -873,17 +878,12 @@ def process_monitor_holdings_dataframe(holdings_df, all_submissions):
                 how='outer'
             )
 
-    # Fill NaN values with 0
     merged_holdings_df.fillna(0, inplace=True)
 
-    # Convert all columns except 'Company Name' to integers
     for col in merged_holdings_df.columns[1:]:
         merged_holdings_df[col] = merged_holdings_df[col].astype(int)
 
-    # Reorder columns to place 'Company Name' first and reverse the order of other columns
     columns_order = ['Company Name'] + [col for col in merged_holdings_df.columns if col != 'Company Name'][::-1]
     merged_holdings_df = merged_holdings_df[columns_order]
 
-    # Convert the merged DataFrame to a dictionary and return it along with the column order
     return merged_holdings_df.to_dict(orient='records'), columns_order
-
