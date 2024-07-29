@@ -196,9 +196,22 @@ def add_more_submissions(cik: str) -> object:
 @routes.route('/fund_favorites', methods=['GET', 'POST'])
 @login_required
 def fund_favorites():
-    favorite_funds = current_user.favorite_funds
-    monitored_cik = request.form.get('monitored_cik', None)
+    """
+    Display and manage favorite funds for the current user. Allows monitoring a selected fund.
 
+    Methods:
+        GET: Renders the favorite funds page.
+        POST: Updates the monitored fund based on user selection.
+
+    Returns:
+        Renders the 'fund_favorites.html' template with the favorite funds, selected fund details,
+        submissions, and holdings.
+    """
+    # Retrieve the user's favorite funds
+    favorite_funds = current_user.favorite_funds
+
+    # Get the monitored CIK from the form, default to the first favorite fund's CIK if not provided
+    monitored_cik = request.form.get('monitored_cik', None)
     if not monitored_cik and favorite_funds:
         monitored_cik = favorite_funds[0].fund.cik
 
@@ -206,17 +219,23 @@ def fund_favorites():
     all_submissions = []
     holdings_list = []
 
+    # If a monitored CIK is available, fetch and process its holdings
     if monitored_cik:
         fund, all_submissions, holdings_df = fetch_and_process_holdings(monitored_cik)
+
+        # If the fund is not found, flash a message and redirect to the favorites page
         if not fund:
             flash('This Fund does not provide holding filings.')
             return redirect(url_for('routes.fund_favorites'))
 
+        # Process the holdings dataframe to get the holdings list
         holdings_list = process_holdings_dataframe(holdings_df, all_submissions)
 
+    # If no favorite funds are available, flash a message to the user
     if not favorite_funds:
         flash('Add Fund to favorites to get stats.')
 
+    # Render the 'fund_favorites.html' template with the necessary data
     return render_template('fund_favorites.html', favorite_funds=favorite_funds, year=datetime.now().year,
                            fund=fund, submissions=all_submissions, newest_holdings=holdings_list,
                            monitored_cik=monitored_cik)
@@ -482,7 +501,6 @@ def monitor():
     favorite_funds = current_user.favorite_funds
 
     if not favorite_funds:
-        # flash('Add Fund to favorites to get stats.')
         return render_template('monitor.html', year=datetime.now().year, message='Add Fund to favorites to get stats.')
 
     fund_name_and_cik = [(favorite.fund.fund_name, favorite.fund.cik) for favorite in favorite_funds]
@@ -514,7 +532,7 @@ def monitor():
         flash('This Fund does not provide holding filings.')
         return redirect(url_for('routes.monitor'))
 
-    holdings_list = process_monitor_holdings_dataframe(holdings_df, all_submissions)
+    holdings_list, headers = process_monitor_holdings_dataframe(holdings_df, all_submissions)
     newest_submission = all_submissions[0] if all_submissions else None
 
     return render_template('monitor.html',
@@ -525,7 +543,8 @@ def monitor():
                            favorite_funds=favorite_funds,
                            monitored_cik=monitored_cik,
                            submissions=all_submissions,
-                           newest_submission=newest_submission)
+                           newest_submission=newest_submission,
+                           headers=headers)
 
 
 @login_required

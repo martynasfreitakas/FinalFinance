@@ -5,7 +5,6 @@
 {% endblock %}
 
 {% block content %}
-
     {% if favorite_funds %}
         <div class="favorite-funds-block">
             <h2>Favorite Funds</h2>
@@ -46,11 +45,11 @@
         {% if newest_submission %}
             <h3>Newest Submission Details</h3>
             <div class="newest-holdings">
-                <p>Filed Date: {{ newest_submission.filed_of_date }}</p>
-                <p>Period: {{ newest_submission.period_of_portfolio }}</p>
-                <p>Portfolio value (USD): {{ "%.2f"|format(newest_submission.fund_portfolio_value) }}</p>
-                <p>Submission Type: {{ newest_submission.submission_type }}</p>
-                <p>Accession Number: {{ newest_submission.accession_number }}</p>
+                <p>Filed Date: {{ newest_submission['filed_of_date'] }}</p>
+                <p>Period: {{ newest_submission['period_of_portfolio'] }}</p>
+                <p>Portfolio value (USD): {{ "%.2f"|format(newest_submission['fund_portfolio_value']) }}</p>
+                <p>Submission Type: {{ newest_submission['submission_type'] }}</p>
+                <p>Accession Number: {{ newest_submission['accession_number'] }}</p>
             </div>
         {% endif %}
 
@@ -60,7 +59,7 @@
                 <thead>
                     <tr>
                         <th>Company Name</th>
-                        {% for col in newest_holdings[0].keys() %}
+                        {% for col in headers %}
                             {% if col != 'Company Name' %}
                                 <th>{{ col }}</th>
                             {% endif %}
@@ -71,7 +70,7 @@
                     {% for holding in newest_holdings %}
                         <tr>
                             <td>{{ holding['Company Name'] }}</td>
-                            {% for col in holding.keys() %}
+                            {% for col in headers %}
                                 {% if col != 'Company Name' %}
                                     <td>{{ holding[col] }}</td>
                                 {% endif %}

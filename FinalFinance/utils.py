@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Optional, Dict, Any, List
 
 import pandas as pd
@@ -710,18 +711,39 @@ def fetch_and_process_holdings(cik, start_date=None, end_date=None):
         columns=['Company Name', 'Value (USD)', 'Share Amount', 'Accession Number']
     )
 
+    # Create a dictionary to track the count of reports for each quarter
+    submissions_by_date = defaultdict(list)
+    for submission in all_submissions:
+        submissions_by_date[submission.filed_of_date].append(submission)
+
+    processed_submissions = []
+    for date in sorted(submissions_by_date.keys(), reverse=True):
+        submissions = submissions_by_date[date]
+        for i, submission in enumerate(submissions, start=1):
+            period_with_suffix = f"{submission.period_of_portfolio}_{i}"
+            processed_submissions.append({
+                'filed_of_date': submission.filed_of_date,
+                'period_of_portfolio': period_with_suffix,
+                'submission_type': submission.submission_type,
+                'accession_number': submission.accession_number,
+                'fund_portfolio_value': submission.fund_portfolio_value
+            })
+
+    # Sort processed_submissions by Accession Number in descending order
+    processed_submissions.sort(key=lambda x: x['accession_number'], reverse=True)
+
     # Sort DataFrame by Company Name and Accession Number
     holdings_df.sort_values(by=['Company Name', 'Accession Number'], ascending=[True, False], inplace=True)
 
-    return fund, all_submissions, holdings_df
+    return fund, processed_submissions, holdings_df
 
 
 def process_holdings_dataframe(holdings_df, all_submissions):
     """
     Process the holdings DataFrame to compare current and previous holdings.
     """
-    most_recent_accession = all_submissions[0].accession_number if all_submissions else None
-    previous_accession = all_submissions[1].accession_number if len(all_submissions) > 1 else None
+    most_recent_accession = all_submissions[0]['accession_number'] if all_submissions else None
+    previous_accession = all_submissions[1]['accession_number'] if len(all_submissions) > 1 else None
 
     if not most_recent_accession:
         return []
@@ -805,17 +827,45 @@ def process_holdings_dataframe(holdings_df, all_submissions):
 def process_monitor_holdings_dataframe(holdings_df, all_submissions):
     """
     Process the holdings DataFrame specifically for the monitor view.
-    """
-    accession_numbers = [submission.accession_number for submission in all_submissions]
-    periods = [submission.period_of_portfolio for submission in all_submissions]
 
+    This function merges multiple holdings submissions into a single DataFrame, organizing
+    the data by company name and submission period. It also ensures that the periods are
+    uniquely identified even if multiple submissions exist within the same period.
+
+    Args:
+        holdings_df (pd.DataFrame): DataFrame containing holdings data.
+        all_submissions (list): List of dictionaries containing submission details.
+
+    Returns:
+        tuple: A tuple containing:
+            - list: List of dictionaries representing the processed holdings data.
+            - list: List of column headers for the merged DataFrame.
+    """
+    # Extract accession numbers and periods from all_submissions
+    accession_numbers = [submission['accession_number'] for submission in all_submissions]
+    periods = [submission['period_of_portfolio'] for submission in all_submissions]
+
+    # Initialize the merged DataFrame with 'Company Name' column
     merged_holdings_df = pd.DataFrame(columns=['Company Name'])
 
+    # Dictionary to keep track of period suffixes
+    period_counts = {}
+
+    # Loop through accession numbers and periods to merge data
     if accession_numbers:
         for i, (accession_number, period) in enumerate(zip(accession_numbers, periods)):
+            # Increment the period count for unique suffix
+            period_counts[period] = period_counts.get(period, 0) + 1
+            period_suffix = period_counts[period]
+
+            # Create the column name with or without suffix
+            column_name = f'{period}_{period_suffix}' if period_suffix > 1 else period
+
+            # Filter and rename columns in the temporary DataFrame
             temp_df = holdings_df[holdings_df['Accession Number'] == accession_number].copy()
-            column_name = f'{period}' if i != 0 else 'Newest'
             temp_df.rename(columns={'Share Amount': column_name}, inplace=True)
+
+            # Merge the temporary DataFrame with the merged DataFrame
             merged_holdings_df = pd.merge(
                 merged_holdings_df,
                 temp_df[['Company Name', column_name]],
@@ -823,16 +873,17 @@ def process_monitor_holdings_dataframe(holdings_df, all_submissions):
                 how='outer'
             )
 
+    # Fill NaN values with 0
     merged_holdings_df.fillna(0, inplace=True)
 
+    # Convert all columns except 'Company Name' to integers
     for col in merged_holdings_df.columns[1:]:
         merged_holdings_df[col] = merged_holdings_df[col].astype(int)
 
-    columns_order = ['Company Name'] + [col for col in merged_holdings_df.columns if
-                                        col not in ['Company Name', 'Newest']][::-1] + ['Newest']
+    # Reorder columns to place 'Company Name' first and reverse the order of other columns
+    columns_order = ['Company Name'] + [col for col in merged_holdings_df.columns if col != 'Company Name'][::-1]
     merged_holdings_df = merged_holdings_df[columns_order]
 
-    condition = (merged_holdings_df['Newest'] == 0) & (merged_holdings_df.iloc[:, 1:-1].sum(axis=1) != 0)
-    zero_share_but_previous_non_zero = merged_holdings_df[condition]
+    # Convert the merged DataFrame to a dictionary and return it along with the column order
+    return merged_holdings_df.to_dict(orient='records'), columns_order
 
-    return merged_holdings_df.to_dict(orient='records')

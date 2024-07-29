@@ -46,11 +46,11 @@
             <div class="fund-details-left">
                 <h2>Newest Submission Details</h2>
                 <div class="newest-holdings">
-                    <p>Filed Date: {{ submissions[0].filed_of_date }}</p>
-                    <p>Period: {{ submissions[0].period_of_portfolio }}</p>
-                    <p>Portfolio value (USD): {{ submissions[0].fund_portfolio_value }}</p>
-                    <p>Submission Type: {{ submissions[0].submission_type }}</p>
-                    <p>Accession Number: {{ submissions[0].accession_number }}</p>
+                    <p>Filed Date: {{ submissions[0]['filed_of_date'] }}</p>
+                    <p>Period: {{ submissions[0]['period_of_portfolio'] }}</p>
+                    <p>Portfolio value (USD): {{ "%.2f"|format(submissions[0]['fund_portfolio_value']) }}</p>
+                    <p>Submission Type: {{ submissions[0]['submission_type'] }}</p>
+                    <p>Accession Number: {{ submissions[0]['accession_number'] }}</p>
                 </div>
 
                 <h2>Fund Holdings</h2>
@@ -109,11 +109,11 @@
                     <tbody>
                         {% for submission in submissions %}
                         <tr>
-                            <td><a href="{{ url_for('routes.submission_details', accession_number=submission.accession_number) }}">
-                                {{ submission.filed_of_date }}</a></td>
-                            <td>{{ submission.period_of_portfolio }}</td>
-                            <td>{{ submission.submission_type }}</td>
-                            <td>{{ submission.accession_number }}</td>
+                            <td><a href="{{ url_for('routes.submission_details', accession_number=submission['accession_number']) }}">
+                                {{ submission['filed_of_date'] }}</a></td>
+                            <td>{{ submission['period_of_portfolio'] }}</td>
+                            <td>{{ submission['submission_type'] }}</td>
+                            <td>{{ submission['accession_number'] }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
