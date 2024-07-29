@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from .database import db
-from flask import render_template, flash, redirect, url_for, request, Blueprint, send_from_directory, current_app
+from flask import render_template, flash, redirect, url_for, request, Blueprint, send_from_directory, current_app, session
 from .forms import SignUpForm, LoginForm, UpdateProfileForm, AdminSignUpForm
 from .models import User, FundData, Submission, AddFundToFavorites, FundHoldings, AdminUser
 from .utils import edgar_downloader_from_sec, get_fund_lists, save_plot_to_file, get_rss_feed_entries, \
@@ -12,6 +12,9 @@ import re
 import os
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash
+from functools import wraps
+
+
 
 # Define the blueprint for routes
 routes = Blueprint('routes', __name__)
