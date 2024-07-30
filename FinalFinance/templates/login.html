@@ -1,27 +1,58 @@
 {% extends 'base.html' %}
 
+{% block title %}Login{% endblock %}
+
 {% block content %}
-    <h1>Login</h1>
+    <div class="container mt-5" style="max-width: 600px; margin-left: 50px;"> <!-- Added max-width and left margin -->
+        <h1 class="text-center mb-4">Login</h1> <!-- Centered heading with bottom margin -->
 
-    {% set flask_messages = get_flashed_messages() %}
-    {% if flask_messages %}
-        <ul>
-            {% for message in flask_messages %}
-                <li>{{ message }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
+        {% set flask_messages = get_flashed_messages() %}
+        {% if flask_messages %}
+            <div class="alert alert-warning" role="alert">
+                <ul class="mb-0">
+                    {% for message in flask_messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
 
-    <form method="post">
-        {{ form.hidden_tag() }}
-        <div class="form-group">
-            <label for="username">Username</label>
-            {{ form.username(class="form-control", id="username", placeholder="Enter your username") }}
+        <form method="post">
+            {{ form.hidden_tag() }}
+            <table class="table">
+                <tr>
+                    <td><label for="username">Username</label></td>
+                    <td>
+                        {{ form.username(class="form-control", id='username', placeholder="Enter your username") }}
+                        {% if form.username.errors %}
+                            {% for error in form.username.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
+
+                <tr>
+                    <td><label for="password">Password</label></td>
+                    <td>
+                        {{ form.password(class="form-control", id='password', placeholder="Enter your password") }}
+                        {% if form.password.errors %}
+                            {% for error in form.password.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
+
+                <tr>
+                    <td colspan="2">
+                        <button type="submit" class="btn btn-primary btn-block mt-4">Login</button> <!-- Added margin-top class -->
+                    </td>
+                </tr>
+            </table>
+        </form>
+        <div class="text-center mt-3">
+            <p>Don't have an account? <a href="{{ url_for('routes.signup') }}">Sign up</a></p>
         </div>
-        <div class="form-group">
-            <label for="password">Password</label>
-            {{ form.password(class="form-control", id="password", placeholder="Enter your password") }}
-        </div>
-        <button type="submit" class="btn btn-primary">Login</button>
-    </form>
+    </div>
 {% endblock %}

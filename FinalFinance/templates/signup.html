@@ -1,65 +1,117 @@
 {% extends 'base.html' %}
 
+{% block title %}Sign Up{% endblock %}
+
 {% block content %}
-    <h1>Sign Up</h1>
-    {% set flask_messages = get_flashed_messages() %}
-    {% if flask_messages %}
-        <ul>
-            {% for message in flask_messages %}
-                <li>{{ message }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-    <form method="post">
-        {{ form.hidden_tag() }}
-        <label for="username">Username</label>
-        {{ form.username(id='username') }}
-        {% if form.username.errors %}
-            {% for error in form.username.errors %}
-                <div class="error">{{ error }}</div>
-            {% endfor %}
+    <div class="container mt-5" style="max-width: 600px; margin-left: 50px;">
+        <h1 class="text-center mb-4">Sign Up</h1>
+
+        {% set flask_messages = get_flashed_messages() %}
+        {% if flask_messages %}
+            <div class="alert alert-warning" role="alert">
+                <ul class="mb-0">
+                    {% for message in flask_messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
         {% endif %}
 
-        <label for="email">Email</label>
-        {{ form.email(id='email') }}
-        {% if form.email.errors %}
-            {% for error in form.email.errors %}
-                <div class="error">{{ error }}</div>
-            {% endfor %}
-        {% endif %}
+        <form method="post">
+            {{ form.hidden_tag() }}
+            <table class="table">
+                <tr>
+                    <td><label for="username">Username <span class="text-danger">*</span></label></td>
+                    <td>
+                        {{ form.username(class="form-control", id='username', placeholder="Enter your username") }}
+                        {% if form.username.errors %}
+                            {% for error in form.username.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
 
-        <label for="name">Name</label>
-        {{ form.name(id='name') }}
-        {% if form.name.errors %}
-            {% for error in form.name.errors %}
-                <div class="error">{{ error }}</div>
-            {% endfor %}
-        {% endif %}
+                <tr>
+                    <td><label for="email">Email <span class="text-danger">*</span></label></td>
+                    <td>
+                        {{ form.email(class="form-control", id='email', placeholder="Enter your email") }}
+                        {% if form.email.errors %}
+                            {% for error in form.email.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
 
-        <label for="surname">Surname</label>
-        {{ form.surname(id='surname') }}
-        {% if form.surname.errors %}
-            {% for error in form.surname.errors %}
-                <div class="error">{{ error }}</div>
-            {% endfor %}
-        {% endif %}
+                <tr>
+                    <td><label for="name">Name</label></td>
+                    <td>
+                        {{ form.name(class="form-control", id='name', placeholder="Enter your name") }}
+                        {% if form.name.errors %}
+                            {% for error in form.name.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
 
-        <label for="phone_number">Phone Number</label>
-        {{ form.phone_number(id='phone_number') }}
-        {% if form.phone_number.errors %}
-            {% for error in form.phone_number.errors %}
-                <div class="error">{{ error }}</div>
-            {% endfor %}
-        {% endif %}
+                <tr>
+                    <td><label for="surname">Surname</label></td>
+                    <td>
+                        {{ form.surname(class="form-control", id='surname', placeholder="Enter your surname") }}
+                        {% if form.surname.errors %}
+                            {% for error in form.surname.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
 
-        <label for="password">Password</label>
-        {{ form.password(id='password') }}
-        {% if form.password.errors %}
-            {% for error in form.password.errors %}
-                <div class="error">{{ error }}</div>
-            {% endfor %}
-        {% endif %}
+                <tr>
+                    <td><label for="phone_number">Phone Number</label></td>
+                    <td>
+                        {{ form.phone_number(class="form-control", id='phone_number', placeholder="Enter your phone number") }}
+                        {% if form.phone_number.errors %}
+                            {% for error in form.phone_number.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
 
-        {{ form.submit() }}
-    </form>
+                <tr>
+                    <td><label for="password">Password <span class="text-danger">*</span></label></td>
+                    <td>
+                        {{ form.password(class="form-control", id='password', placeholder="Enter your password") }}
+                        {% if form.password.errors %}
+                            {% for error in form.password.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
+
+                <tr>
+                    <td><label for="confirm_password">Confirm Password <span class="text-danger">*</span></label></td>
+                    <td>
+                        {{ form.confirm_password(class="form-control", id='confirm_password', placeholder="Re-enter your password") }}
+                        {% if form.confirm_password.errors %}
+                            {% for error in form.confirm_password.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
+
+                <tr>
+                    <td colspan="2">
+                        <button type="submit" class="btn btn-primary btn-block mt-4">Sign Up</button>
+                    </td>
+                </tr>
+            </table>
+
+            <p class="text-muted mt-3"><small><span class="text-danger">*</span> - Fields are required</small></p> <!-- Required fields note -->
+        </form>
+    </div>
 {% endblock %}

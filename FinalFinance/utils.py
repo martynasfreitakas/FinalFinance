@@ -628,21 +628,12 @@ def validate_name_surname_format_only_str(form: FlaskForm, field: StringField) -
         raise ValidationError("Field must contain only letters.")
 
 
-def validate_match(form: FlaskForm, field1: str, field2: str) -> None:
+def validate_passwords_match(form: FlaskForm, field):
     """
-    Validator to ensure that two fields in a WTForms form match.
-
-    Args:
-        form (FlaskForm): The form object.
-        field1 (str): Name of the first field to compare.
-        field2 (str): Name of the second field to compare.
-
-    Raises:
-        ValidationError: If the fields do not match.
+    Validator to check if the password and confirm password fields match.
     """
-    # Check if the values of the two fields match
-    if form[field1].data != form[field2].data:
-        raise ValidationError(f"{field1.capitalize()}s must match.")
+    if field.data != form.password.data:
+        raise ValidationError('Passwords must match.')
 
 
 def validate_current_password(form: FlaskForm, field: StringField) -> None:

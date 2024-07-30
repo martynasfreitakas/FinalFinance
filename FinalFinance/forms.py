@@ -2,7 +2,7 @@ from wtforms import StringField, PasswordField, SubmitField, EmailField
 from flask_wtf import FlaskForm
 from wtforms.validators import DataRequired, Email, Optional, EqualTo
 from .utils import (validate_phone_format, validate_name_surname_format_only_str, validate_unique_phone_number,
-                    validate_password_strong_password, validate_admin_pin)
+                    validate_password_strong_password, validate_admin_pin, validate_passwords_match)
 
 
 class SignUpForm(FlaskForm):
@@ -27,6 +27,7 @@ class SignUpForm(FlaskForm):
     surname = StringField('Surname', validators=[Optional(), validate_name_surname_format_only_str])
     phone_number = StringField('Phone Number', validators=[validate_phone_format, validate_unique_phone_number])
     password = PasswordField('Password', validators=[DataRequired(), validate_password_strong_password])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), validate_passwords_match])
     submit = SubmitField('Submit')
 
 
