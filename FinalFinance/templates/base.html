@@ -77,6 +77,7 @@
                         <li><a href="{{ url_for('routes.fund_search') }}">Fund Search</a></li>
                         <li><a href="{{ url_for('routes.fund_favorites') }}">Favorites</a></li>
                         <li><a href="{{ url_for('routes.monitor') }}">Monitor</a></li>
+                        <li><a href="{{ url_for('routes.about') }}">About</a></li>
                     {% else %}
                         <li><a href="{{ url_for('routes.about') }}">About</a></li>
                     {% endif %}
@@ -108,7 +109,7 @@
         {% block content %}{% endblock %}
     </main>
     <footer>
-        <p>&copy; {{ year }} FinalFinance</p>
+        <p>&copy; {{ year }} FinalFinance. All rights reserved.</p>
     </footer>
 </body>
 </html>

@@ -1,13 +1,74 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <div class="column about-us">
-            <h2>About Us</h2>
-            <p>FinalFinance is a financial information website that provides investment data for individual
-                investors, particularly those interested in value investing. The site aggregates and displays
-                information about the stock holdings of prominent investment managers,
-                enabling users to track the portfolios of some of the most successful investors in the world.
-                FinalFinance is a valuable resource for individual investors looking to make informed decisions
-                by leveraging the insights and strategies of highly successful value investors.</p>
+    <div class="about-us">
+        <h2>About Us</h2>
+        <div class="about-content">
+            <div class="about-text">
+                <p>FinalFinance is a financial information website that provides investment data for individual
+                    investors, particularly those interested in value investing. The site aggregates and displays
+                    information about the stock holdings of prominent investment managers,
+                    enabling users to track the portfolios of some of the most successful investors in the world.
+                    FinalFinance is a valuable resource for individual investors looking to make informed decisions
+                    by leveraging the insights and strategies of highly successful value investors.</p>
+            </div>
+            <img src="{{ url_for('static', filename='about_image.png') }}" alt="Finance World Image" class="features-image">
         </div>
+    </div>
+
+    <section class="features-section">
+        <h2>Features</h2>
+        <div class="features-table-container">
+            <table class="features-table" border="1">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Guests</th>
+                        <th>Registered Users</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Access to Fund Search</td>
+                        <td>&#10003;</td>
+                        <td>&#10003;</td>
+                    </tr>
+                    <tr>
+                        <td>View basic fund details</td>
+                        <td>&#10003;</td>
+                        <td>&#10003;</td>
+                    </tr>
+                    <tr>
+                        <td>Read our latest RSS feed entries</td>
+                        <td>&#10003;</td>
+                        <td>&#10003;</td>
+                    </tr>
+                    <tr>
+                        <td>Add funds to favorites</td>
+                        <td></td>
+                        <td>&#10003;</td>
+                    </tr>
+                    <tr>
+                        <td>Monitor and get statistics on favorite funds</td>
+                        <td></td>
+                        <td>&#10003;</td>
+                    </tr>
+                    <tr>
+                        <td>Access to detailed fund submissions and holdings</td>
+                        <td></td>
+                        <td>&#10003;</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    {% if not current_user.is_authenticated %}
+    <section class="call-to-action-section">
+        <h2>Join Us Today</h2>
+        <p>Register now to unlock all the premium features and get the most out of our financial insights platform.</p>
+        <a href="{{ url_for('routes.signup') }}" class="call-to-action-button">Sign Up</a>
+        <p>Already have an account? <a href="{{ url_for('routes.login') }}">Log in</a></p>
+    </section>
+    {% endif %}
 {% endblock %}
