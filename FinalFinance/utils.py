@@ -246,11 +246,9 @@ def extract_holdings_from_file(path_to_file: str) -> None:
     with open(path_to_file, 'r') as file:
         data = file.read()
 
-    # Parse the file content with BeautifulSoup
     soup = BeautifulSoup(data, 'lxml')
     tags = soup.find_all(['infotable', 'ns1:infotable', 'invstorsec'])
 
-    # Regular expressions to extract various metadata from the file
     cik_tag_line = re.compile(r'CENTRAL INDEX KEY:\s+(\d+)')
     owner_cik = cik_tag_line.search(data).group(1) if cik_tag_line.search(data) else None
 
@@ -284,16 +282,13 @@ def extract_holdings_from_file(path_to_file: str) -> None:
     else:
         period_of_portfolio = None
 
-    # Retrieve the fund data from the database
     fund_data = FundData.query.filter_by(cik=owner_cik).first()
     if not fund_data:
         print(f"No FundData found for CIK: {owner_cik}")
         return
 
-    # Check if the submission already exists in the database
     existing_submission = Submission.query.filter_by(accession_number=accession_number).first()
     if existing_submission:
-        # Update the existing submission
         submission = existing_submission
         submission.cik = owner_cik
         submission.company_name = company_conformed_name
@@ -302,7 +297,6 @@ def extract_holdings_from_file(path_to_file: str) -> None:
         submission.period_of_portfolio = period_of_portfolio
         submission.fund_data_id = fund_data.id
     else:
-        # Add a new submission to the database
         submission = Submission(
             cik=owner_cik,
             company_name=company_conformed_name,
@@ -319,7 +313,6 @@ def extract_holdings_from_file(path_to_file: str) -> None:
 
     for tag in tags:
         try:
-            # Extract holdings information based on the tag type
             if tag.name in ['infotable', 'ns1:infotable']:
                 nameofissuer = tag.find(['nameofissuer', 'ns1:nameofissuer']).text.strip() if tag.find(
                     ['nameofissuer', 'ns1:nameofissuer']) else None
@@ -338,11 +331,9 @@ def extract_holdings_from_file(path_to_file: str) -> None:
             if nameofissuer:
                 fund_owns_companies += 1
 
-            # Check if the fund holding already exists in the database
             existing_fund_holding = FundHoldings.query.filter_by(company_name=nameofissuer,
                                                                  accession_number=accession_number).first()
             if existing_fund_holding:
-                # Update the existing fund holding
                 existing_fund_holding.value_usd = value
                 existing_fund_holding.share_amount = sshprnamt
                 existing_fund_holding.cusip = cusip
@@ -350,7 +341,6 @@ def extract_holdings_from_file(path_to_file: str) -> None:
                 existing_fund_holding.period_of_portfolio = period_of_portfolio
                 existing_fund_holding.fund_data_id = fund_data.id
             else:
-                # Add a new fund holding to the database
                 fund_holding = FundHoldings(
                     company_name=nameofissuer,
                     value_usd=value,
@@ -366,7 +356,6 @@ def extract_holdings_from_file(path_to_file: str) -> None:
         except Exception as e:
             print(f"Error processing tag: {e}")
 
-    # Update the submission with portfolio value and number of owned companies
     submission.fund_portfolio_value = fund_portfolio_value
     submission.fund_owns_companies = fund_owns_companies
 
@@ -387,7 +376,6 @@ def get_fund_lists() -> Dict[str, str]:
     Returns:
         Dict[str, str]: A dictionary where the keys are fund names and the values are their CIKs.
     """
-    # Manually set dictionary of well-known funds and their CIKs
     well_known_funds = {
         'Berkshire Hathaway': '0001067983',
         'Sequoia Fund': '0000089043',
@@ -406,7 +394,6 @@ def save_plot_to_file(ticker_symbol: str = 'SPY', period: str = '1y', interval: 
     try:
         print(f"Generating plot for {ticker_symbol} with period {period} and interval {interval}")
 
-        # Retrieve historical stock price data
         ticker = Ticker(ticker_symbol)
         hist = ticker.history(period=period, interval=interval)
         print(f"Retrieved historical data for {ticker_symbol}")
