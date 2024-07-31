@@ -18,10 +18,9 @@ class ModelsTestCase(unittest.TestCase):
         self.app_context.pop()
 
     def test_user_creation(self):
-        user = User(username='astest', email='test@as.lt')
+        user = User(username='astest', email='test@as.lt', password='slaptazodis')
         user.surname = 'labas'
         user.phone_number = '888'
-        user.password = 'slaptazodis'
         db.session.add(user)
         db.session.commit()
         self.assertEqual(user.username, 'astest')
@@ -74,8 +73,7 @@ class ModelsTestCase(unittest.TestCase):
         self.assertEqual(holding.company_name, 'Test Holding')
 
     def test_add_fund_to_favorites(self):
-        user = User(username='testuser', email='test@example.com')
-        user.password = 'testpassword'
+        user = User(username='testuser', email='test@example.com', password='testpassword')
         db.session.add(user)
         db.session.commit()
 

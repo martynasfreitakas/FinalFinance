@@ -47,7 +47,7 @@ class UtilsTestCase(unittest.TestCase):
 
     @patch('FinalFinance.utils.Ticker')
     def test_save_plot_to_file(self, mock_ticker):
-        # Create a DataFrame to mock the historical data
+
         data = {
             'Close': [100, 200],
             'Date': pd.to_datetime(['2021-01-01', '2021-01-02'])

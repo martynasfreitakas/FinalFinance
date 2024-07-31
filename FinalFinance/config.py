@@ -21,6 +21,9 @@ class Config(object):
     # Swich between ENV: $env:FLASK_ENV="enviroment"
     # Check ENV: echo $env:FLASK_ENV
 
+    # Swich between ENV: $env:FLASK_ENV="testing"
+    # Check ENV: echo $env:FLASK_ENV
+
     ENV = 'development'  # Default to development
 
     # The URI for the database connection, fetched from the environment variable 'DATABASE_URL'

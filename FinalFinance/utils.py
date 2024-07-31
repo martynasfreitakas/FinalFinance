@@ -402,21 +402,6 @@ def save_plot_to_file(ticker_symbol: str = 'SPY', period: str = '1y', interval: 
                       filename: Optional[str] = None) -> Optional[str]:
     """
     Generate a plot of historical stock prices for a given ticker symbol and save it to a file.
-
-    This function retrieves historical stock price data for a given ticker symbol, generates a plot of the closing prices,
-    and saves the plot to a specified file.
-
-    Args:
-        ticker_symbol (str): The ticker symbol for the stock. Defaults to 'SPY'.
-        period (str): The period of the data to retrieve. Defaults to '1y'.
-                      Possible values include '1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'.
-        interval (str): The interval between data points. Defaults to '1d'.
-                        Possible values include '1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d',
-                        '1wk', '1mo', '3mo'.
-        filename (Optional[str]): The path to the file where the plot will be saved. If None, the plot is not saved.
-
-    Returns:
-        Optional[str]: The filename where the plot is saved, or None if the plot is not saved.
     """
     try:
         print(f"Generating plot for {ticker_symbol} with period {period} and interval {interval}")

@@ -250,10 +250,10 @@ footer {
 
 .about-content {
     display: flex;
-    align-items: center; /* Center items vertically */
-    justify-content: center; /* Center items horizontally */
-    margin: 0 auto; /* Center the block */
-    max-width: 1100px; /* Optional: Set a max width */
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    max-width: 1100px;
 }
 
 .about-text {
@@ -305,7 +305,6 @@ footer {
     background-color: #f9f9f9;
 }
 
-/* Call to Action Section */
 .call-to-action-section {
     padding: 2rem;
     text-align: center;

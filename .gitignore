@@ -27,3 +27,7 @@ FUNDS.md
 **/plots/
 
 *migrations/
+
+# Coverage reports
+.coverage
+coverage/

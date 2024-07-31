@@ -2,7 +2,8 @@ import uuid
 from datetime import datetime
 
 from .database import db
-from flask import render_template, flash, redirect, url_for, request, Blueprint, send_from_directory, current_app, session
+from flask import render_template, flash, redirect, url_for, request, Blueprint, send_from_directory, current_app, \
+    session
 from .forms import SignUpForm, LoginForm, UpdateProfileForm, AdminSignUpForm
 from .models import User, FundData, Submission, AddFundToFavorites, FundHoldings, AdminUser
 from .utils import edgar_downloader_from_sec, get_fund_lists, save_plot_to_file, get_rss_feed_entries, \
@@ -14,8 +15,6 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash
 from functools import wraps
 
-
-
 # Define the blueprint for routes
 routes = Blueprint('routes', __name__)
 
@@ -24,12 +23,6 @@ routes = Blueprint('routes', __name__)
 def home() -> str:
     """
     Route for the home page.
-
-    This function renders the home page, displaying well-known funds, RSS feed entries, and a plot image.
-    The plot image is generated and saved if it does not already exist for the current day.
-
-    Returns:
-        str: The rendered HTML template for the home page.
     """
     # Retrieve a list of well-known funds
     well_known_funds = get_fund_lists()
@@ -41,42 +34,45 @@ def home() -> str:
     ticker_symbol = 'spy'
     today_date = datetime.now().strftime('%Y-%m-%d')
     image_filename = f'plot_{ticker_symbol}_{today_date}.png'
-    image_path = os.path.join('FinalFinance', 'static', 'images', image_filename)
-    print(f"Saving plot to: {image_path}")
+    # Use absolute path for saving the image
+    image_path = os.path.abspath(os.path.join('FinalFinance', 'static', 'images', image_filename))
+    print(f"Image path: {image_path}")
 
     # Ensure the static/images directory exists
     os.makedirs(os.path.dirname(image_path), exist_ok=True)
 
     # Check if the image for today already exists
     if not os.path.exists(image_path):
+        print("Image does not exist, generating new plot.")
         # Generate and save the plot image
         save_plot_to_file(ticker_symbol=ticker_symbol, period='1y', interval='1d', filename=image_path)
+    else:
+        print("Image already exists.")
 
     # Render the home page template with the required context variables
     return render_template('home.html', well_known_funds=well_known_funds,
                            rss_feed_entries=rss_feed_entries, image_filename=image_filename, year=datetime.now().year)
-
-
-@routes.route('/static/images/<path:filename>')
-def custom_static(filename: str) -> object:
-    """
-    Route for serving static image files.
-
-    This function serves static image files from the 'static/images' directory.
-    It logs whether the requested file is found or not.
-
-    Args:
-        filename (str): The filename of the requested image.
-
-    Returns:
-        Response: The static file if found, otherwise a 404 error.
-    """
-    file_path = os.path.join('static', 'images', filename)
-    if os.path.exists(file_path):
-        print(f"Serving file: {file_path}")
-    else:
-        print(f"File not found: {file_path}")
-    return send_from_directory(os.path.join('static', 'images'), filename)
+#
+# @routes.route('/static/images/<path:filename>')
+# def custom_static(filename: str) -> object:
+#     """
+#     Route for serving static image files.
+#
+#     This function serves static image files from the 'static/images' directory.
+#     It logs whether the requested file is found or not.
+#
+#     Args:
+#         filename (str): The filename of the requested image.
+#
+#     Returns:
+#         Response: The static file if found, otherwise a 404 error.
+#     """
+#     file_path = os.path.join('static', 'images', filename)
+#     if os.path.exists(file_path):
+#         print(f"Serving file: {file_path}")
+#     else:
+#         print(f"File not found: {file_path}")
+#     return send_from_directory(os.path.join('static', 'images'), filename)
 
 
 @routes.route('/about')
@@ -283,7 +279,7 @@ def add_to_favorites(cik: str) -> object:
         flash('An error occurred while adding the fund to favorites.')
         current_app.logger.error(f"Error adding fund to favorites: {str(e)}")
 
-    return redirect(url_for('routes.fund_search'))
+    return redirect(url_for('routes.fund_favorites'))
 
 
 @routes.route('/remove_from_favorites/<uuid:fund_id>', methods=['POST'])

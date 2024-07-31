@@ -1,11 +1,10 @@
-import os
 import unittest
 from FinalFinance import create_app, db
 from FinalFinance.forms import SignUpForm, LoginForm, UpdateProfileForm, AdminSignUpForm
+from FinalFinance.models import User
 
 
 class TestForms(unittest.TestCase):
-
     def setUp(self):
         self.app = create_app('testing')
         self.app_context = self.app.app_context()
@@ -24,7 +23,8 @@ class TestForms(unittest.TestCase):
             'name': 'as',
             'surname': 'mano',
             'phone_number': '+198767890',
-            'password': 'Password123!'
+            'password': 'Password123!',
+            'confirm_password': 'Password123!'
         })
         self.assertTrue(form.validate())
 
@@ -35,7 +35,8 @@ class TestForms(unittest.TestCase):
             'name': 'Test',
             'surname': 'User',
             'phone_number': '+12345678909',
-            'password': 'Password123!'
+            'password': 'Password123!',
+            'confirm_password': 'Password123!'
         })
         self.assertFalse(form.validate())
 
@@ -53,6 +54,11 @@ class TestForms(unittest.TestCase):
         self.assertFalse(form.validate())
 
     def test_update_profile_form_valid(self):
+        user = User(username='testuser', email='test@as.com')
+        user.password = 'Password123!'
+        db.session.add(user)
+        db.session.commit()
+
         form = UpdateProfileForm(data={
             'email': 'test@example.com',
             'phone_number': '+1234567890',
@@ -60,15 +66,16 @@ class TestForms(unittest.TestCase):
             'new_password': 'NewPassword123!',
             'confirm_new_password': 'NewPassword123!'
         })
+
         self.assertTrue(form.validate())
 
-    def test_update_profile_form_password_mismatch(self):
+    def test_update_profile_form_password_wrong(self):
         form = UpdateProfileForm(data={
             'email': 'test@example.com',
             'phone_number': '1234567890',
             'current_password': 'Password123!',
             'new_password': 'NewPassword123!',
-            'confirm_new_password': 'MismatchPassword!'
+            'confirm_new_password': 'WrongPassword!'
         })
         self.assertFalse(form.validate())
 
@@ -88,7 +95,7 @@ class TestForms(unittest.TestCase):
             'email': 'admin@example.com',
             'password': 'AdminPassword123!',
             'confirm_password': 'AdminPassword123!',
-            'admin_pin': 'invalid'
+            'admin_pin': '5555'
         })
         self.assertFalse(form.validate())
 

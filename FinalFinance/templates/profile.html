@@ -3,82 +3,122 @@
 {% block title %}User Profile{% endblock %}
 
 {% block content %}
-    <h1>User Profile</h1>
-    <p>Username: {{ user.username }}</p>
+    <div class="container mt-5" style="max-width: 600px;">
+        <h1 class="text-center mb-4">User Profile</h1>
 
-    <form method="post">
-        {{ form.hidden_tag() }}
+        <p>Username: {{ user.username }}</p>
 
-        <label for="name">First Name:</label>
-        {{ form.name }}<br>
-        {% if form.name.errors %}
-            {% for error in form.name.errors %}
-                <span style="color: red;">{{ error }}</span><br>
-            {% endfor %}
-        {% endif %}
+        <form method="post" class="mb-5">
+            {{ form.hidden_tag() }}
+            <table class="table">
+                <tr>
+                    <td><label for="name">First Name:</label></td>
+                    <td>
+                        {{ form.name(class="form-control", id='name', placeholder="Enter your first name") }}
+                        {% if form.name.errors %}
+                            {% for error in form.name.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
 
-        <label for="surname">Last Name:</label>
-        {{ form.surname }}<br>
-        {% if form.surname.errors %}
-            {% for error in form.surname.errors %}
-                <span style="color: red;">{{ error }}</span><br>
-            {% endfor %}
-        {% endif %}
+                <tr>
+                    <td><label for="surname">Last Name:</label></td>
+                    <td>
+                        {{ form.surname(class="form-control", id='surname', placeholder="Enter your last name") }}
+                        {% if form.surname.errors %}
+                            {% for error in form.surname.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
 
-        <label for="email">Email:</label>
-        {{ form.email }}<br>
-        {% if form.email.errors %}
-            {% for error in form.email.errors %}
-                <span style="color: red;">{{ error }}</span><br>
-            {% endfor %}
-        {% endif %}
+                <tr>
+                    <td><label for="email">Email:</label></td>
+                    <td>
+                        {{ form.email(class="form-control", id='email', placeholder="Enter your email") }}
+                        {% if form.email.errors %}
+                            {% for error in form.email.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
 
-        <label for="phone_number">Phone Number:</label>
-        {{ form.phone_number }}<br>
-        {% if form.phone_number.errors %}
-            {% for error in form.phone_number.errors %}
-                <span style="color: red;">{{ error }}</span><br>
-            {% endfor %}
-        {% endif %}
+                <tr>
+                    <td><label for="phone_number">Phone Number:</label></td>
+                    <td>
+                        {{ form.phone_number(class="form-control", id='phone_number', placeholder="Enter your phone number") }}
+                        {% if form.phone_number.errors %}
+                            {% for error in form.phone_number.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
+
+                <tr>
+                    <td colspan="2">
+                        <button type="submit" class="btn btn-primary btn-block mt-4">Update Details</button>
+                    </td>
+                </tr>
+            </table>
+        </form>
 
         <hr>
 
-        {{ form.submit_details }}
-    </form>
+        <h2 class="text-center mb-4">Change Password</h2>
+        <form method="post">
+            {{ form.hidden_tag() }}
+            <table class="table">
+                <tr>
+                    <td><label for="current_password">Current Password:</label></td>
+                    <td>
+                        {{ form.current_password(class="form-control", id='current_password', placeholder="Enter your current password") }}
+                        {% if form.current_password.errors %}
+                            {% for error in form.current_password.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
 
-    <hr>
+                <tr>
+                    <td><label for="new_password">New Password:</label></td>
+                    <td>
+                        {{ form.new_password(class="form-control", id='new_password', placeholder="Enter your new password") }}
+                        {% if form.new_password.errors %}
+                            {% for error in form.new_password.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
 
-    <h2>Change Password (Optional)</h2>
-    <form method="post">
-        {{ form.hidden_tag() }}
+                <tr>
+                    <td><label for="confirm_new_password">Confirm New Password:</label></td>
+                    <td>
+                        {{ form.confirm_new_password(class="form-control", id='confirm_new_password', placeholder="Re-enter your new password") }}
+                        {% if form.confirm_new_password.errors %}
+                            {% for error in form.confirm_new_password.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                </tr>
 
-        <label for="current_password">Current Password:</label>
-        {{ form.current_password }}<br>
-        {% if form.current_password.errors %}
-            {% for error in form.current_password.errors %}
-                <span style="color: red;">{{ error }}</span><br>
-            {% endfor %}
-        {% endif %}
+                <tr>
+                    <td colspan="2">
+                        <button type="submit" class="btn btn-primary btn-block mt-4">Change Password</button>
+                    </td>
+                </tr>
+            </table>
+        </form>
 
-        <label for="new_password">New Password:</label>
-        {{ form.new_password }}<br>
-        {% if form.new_password.errors %}
-            {% for error in form.new_password.errors %}
-                <span style="color: red;">{{ error }}</span><br>
-            {% endfor %}
-        {% endif %}
-
-        <label for="confirm_new_password">Confirm New Password:</label>
-        {{ form.confirm_new_password }}<br>
-        {% if form.confirm_new_password.errors %}
-            {% for error in form.confirm_new_password.errors %}
-                <span style="color: red;">{{ error }}</span><br>
-            {% endfor %}
-        {% endif %}
-
-        <br>
-        {{ form.submit_password }}
-    </form>
-
-    <a href="{{ url_for('routes.home') }}">Back to Home</a>
+        <div class="text-center mt-4">
+            <a href="{{ url_for('routes.home') }}" class="btn btn-secondary">Back to Home</a>
+        </div>
+    </div>
 {% endblock %}
