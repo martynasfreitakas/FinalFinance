@@ -3,7 +3,8 @@ import unittest
 from unittest.mock import MagicMock, patch
 import pandas as pd
 from FinalFinance import create_app, db
-from FinalFinance.utils import get_user_agent, download_and_store_all_companies_names_and_cik_from_edgar, save_plot_to_file
+from FinalFinance.utils import get_user_agent, download_and_store_all_companies_names_and_cik_from_edgar, \
+    save_plot_to_file, extract_holdings_from_file
 from FinalFinance.models import FundData
 import tempfile
 import shutil
@@ -61,6 +62,17 @@ class UtilsTestCase(unittest.TestCase):
         result = save_plot_to_file('SPY', '1d', '1d', filename)
         self.assertEqual(result, filename)
         self.assertTrue(os.path.exists(filename))
+
+    @patch('FinalFinance.utils.db')
+    @patch('FinalFinance.utils.open', new_callable=unittest.mock.mock_open, read_data="Mock file content")
+    def test_extract_holdings_from_file(self, mock_open, mock_db):
+        mock_session = MagicMock()
+        mock_db.session = mock_session
+
+        extract_holdings_from_file("path/to/mock/file")
+
+        mock_open.assert_called_once_with("path/to/mock/file", 'r')
+        self.assertTrue(mock_session.commit.called)
 
 
 if __name__ == '__main__':

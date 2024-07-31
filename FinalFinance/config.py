@@ -18,7 +18,7 @@ class Config(object):
         SECRET_KEY (str): Secret key for session management and cryptographic operations.
         USER_AGENT (str): User agent string for making HTTP requests.
     """
-    # Swich between ENV: $env:FLASK_ENV="enviroment"
+    # Swich between ENV: $env:FLASK_ENV="development"
     # Check ENV: echo $env:FLASK_ENV
 
     # Swich between ENV: $env:FLASK_ENV="testing"

@@ -26,9 +26,12 @@ def create_app(config_name=None) -> Flask:
     # Print the FLASK_ENV variable to verify its value
     print("FLASK_ENV:", os.getenv('FLASK_ENV'))
 
+    logging_conf_path = os.path.join(os.path.dirname(__file__), '..', 'logging.conf')
+    logging_conf_path = os.path.abspath(logging_conf_path)
+
     if not os.environ.get('WERKZEUG_RUN_MAIN'):
         try:
-            logging.config.fileConfig('../logging.conf')
+            logging.config.fileConfig(logging_conf_path)
             logging.info('Logging configured successfully')
         except Exception as e:
             logging.basicConfig(level=logging.INFO)
@@ -42,7 +45,7 @@ def create_app(config_name=None) -> Flask:
 
     init_db(app)
 
-    migrate = Migrate(app, db)  # Initialize Flask-Migrate
+    migrate = Migrate(app, db)
 
     login_manager = LoginManager()
     login_manager.init_app(app)
